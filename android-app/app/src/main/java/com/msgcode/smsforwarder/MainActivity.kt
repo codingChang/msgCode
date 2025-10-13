@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.database.Cursor
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -17,6 +19,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.material.switchmaterial.SwitchMaterial
+import java.text.SimpleDateFormat
+import java.util.*
 
 class MainActivity : AppCompatActivity() {
 
@@ -28,6 +32,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvDebugLog: TextView
     private lateinit var btnTest: Button
     private lateinit var btnSimulateSms: Button
+    private lateinit var btnReadSms: Button
     private lateinit var btnSetDefaultSms: Button
     private lateinit var prefs: SharedPreferences
     
@@ -61,6 +66,7 @@ class MainActivity : AppCompatActivity() {
         tvDebugLog = findViewById(R.id.tvDebugLog)
         btnTest = findViewById(R.id.btnTest)
         btnSimulateSms = findViewById(R.id.btnSimulateSms)
+        btnReadSms = findViewById(R.id.btnReadSms)
         btnSetDefaultSms = findViewById(R.id.btnSetDefaultSms)
 
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
@@ -84,6 +90,10 @@ class MainActivity : AppCompatActivity() {
 
         btnSimulateSms.setOnClickListener {
             simulateSmsReceived()
+        }
+
+        btnReadSms.setOnClickListener {
+            readRecentSms()
         }
 
         btnSetDefaultSms.setOnClickListener {
@@ -418,6 +428,142 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("取消", null)
             .show()
+    }
+    
+    private fun readRecentSms() {
+        Log.d("MainActivity", "========== 开始读取短信 ==========")
+        
+        // 检查读取短信权限
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS) 
+            != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "❌ 需要读取短信权限", Toast.LENGTH_LONG).show()
+            return
+        }
+        
+        Toast.makeText(this, "📖 正在读取最近短信...", Toast.LENGTH_SHORT).show()
+        
+        try {
+            val uri = Uri.parse("content://sms/inbox")
+            val projection = arrayOf("address", "body", "date", "type")
+            val sortOrder = "date DESC LIMIT 5"  // 获取最近5条短信
+            
+            val cursor: Cursor? = contentResolver.query(uri, projection, null, null, sortOrder)
+            
+            val smsBuilder = StringBuilder()
+            smsBuilder.append("📱 最近5条短信:\n\n")
+            
+            var smsCount = 0
+            cursor?.use {
+                val addressIndex = it.getColumnIndex("address")
+                val bodyIndex = it.getColumnIndex("body") 
+                val dateIndex = it.getColumnIndex("date")
+                val typeIndex = it.getColumnIndex("type")
+                
+                while (it.moveToNext()) {
+                    smsCount++
+                    val address = if (addressIndex >= 0) it.getString(addressIndex) else "未知"
+                    val body = if (bodyIndex >= 0) it.getString(bodyIndex) else "无内容"
+                    val date = if (dateIndex >= 0) it.getLong(dateIndex) else 0L
+                    val type = if (typeIndex >= 0) it.getInt(typeIndex) else 0
+                    
+                    val dateFormat = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
+                    val timeStr = dateFormat.format(Date(date))
+                    
+                    smsBuilder.append("$smsCount. 发件人: $address\n")
+                    smsBuilder.append("   时间: $timeStr\n")
+                    smsBuilder.append("   内容: ${body.take(50)}${if(body.length > 50) "..." else ""}\n")
+                    smsBuilder.append("   类型: ${if(type == 1) "收件箱" else "其他"}\n\n")
+                }
+            }
+            
+            if (smsCount == 0) {
+                smsBuilder.append("❌ 没有找到短信\n")
+                smsBuilder.append("可能原因:\n")
+                smsBuilder.append("- 权限不足\n") 
+                smsBuilder.append("- 短信数据库为空\n")
+                smsBuilder.append("- 系统限制访问")
+            } else {
+                smsBuilder.append("✅ 成功读取到 $smsCount 条短信")
+            }
+            
+            val result = smsBuilder.toString()
+            Log.d("MainActivity", "短信读取结果:\n$result")
+            
+            // 保存到调试日志
+            prefs.edit().apply {
+                putString("debug_log", result)
+                putLong("debug_log_time", System.currentTimeMillis())
+                apply()
+            }
+            
+            // 显示对话框
+            android.app.AlertDialog.Builder(this)
+                .setTitle("📖 短信读取结果")
+                .setMessage(result)
+                .setPositiveButton("知道了", null)
+                .setNeutralButton("转发最新短信") { _, _ ->
+                    if (smsCount > 0) {
+                        forwardLatestSms()
+                    }
+                }
+                .show()
+                
+        } catch (e: Exception) {
+            Log.e("MainActivity", "读取短信失败", e)
+            val errorMsg = "❌ 读取短信失败: ${e.message}"
+            Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show()
+            
+            prefs.edit().apply {
+                putString("debug_log", errorMsg)
+                putLong("debug_log_time", System.currentTimeMillis())
+                apply()
+            }
+        }
+        
+        Log.d("MainActivity", "========== 短信读取结束 ==========")
+    }
+    
+    private fun forwardLatestSms() {
+        try {
+            val uri = Uri.parse("content://sms/inbox")
+            val projection = arrayOf("address", "body", "date")
+            val sortOrder = "date DESC LIMIT 1"
+            
+            val cursor: Cursor? = contentResolver.query(uri, projection, null, null, sortOrder)
+            
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val addressIndex = it.getColumnIndex("address")
+                    val bodyIndex = it.getColumnIndex("body")
+                    val dateIndex = it.getColumnIndex("date")
+                    
+                    val address = if (addressIndex >= 0) it.getString(addressIndex) else "未知"
+                    val body = if (bodyIndex >= 0) it.getString(bodyIndex) else "无内容"
+                    val date = if (dateIndex >= 0) it.getLong(dateIndex) else System.currentTimeMillis()
+                    
+                    Log.d("MainActivity", "转发最新短信: $address - $body")
+                    
+                    // 调用转发服务
+                    val intent = Intent(this, SmsForwarderService::class.java).apply {
+                        action = "FORWARD_SMS"
+                        putExtra("sender", address)
+                        putExtra("content", body)
+                        putExtra("timestamp", date)
+                    }
+                    
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(intent)
+                    } else {
+                        startService(intent)
+                    }
+                    
+                    Toast.makeText(this, "🚀 正在转发最新短信...", Toast.LENGTH_SHORT).show()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "转发最新短信失败", e)
+            Toast.makeText(this, "❌ 转发失败: ${e.message}", Toast.LENGTH_LONG).show()
+        }
     }
 }
 

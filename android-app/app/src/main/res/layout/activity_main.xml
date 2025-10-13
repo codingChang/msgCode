@@ -126,6 +126,17 @@
                     android:textSize="16sp" />
 
                 <Button
+                    android:id="@+id/btnReadSms"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:backgroundTint="#8b5cf6"
+                    android:padding="12dp"
+                    android:text="📖 读取短信内容"
+                    android:textColor="#FFF"
+                    android:textSize="16sp" />
+
+                <Button
                     android:id="@+id/btnSetDefaultSms"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

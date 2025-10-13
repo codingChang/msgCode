@@ -306,7 +306,7 @@ HTML_TEMPLATE = """
             </p>
             <div class="ip-info">
                 <p><strong>本机IP地址：</strong><span class="ip-address" id="ipAddress">加载中...</span></p>
-                <p><strong>端口：</strong><span class="ip-address">5000</span></p>
+                <p><strong>端口：</strong><span class="ip-address" id="portNumber">5001</span></p></p>
                 <p style="margin-top: 10px; font-size: 14px;">
                     ℹ️ 请在安卓应用中配置此IP地址
                 </p>
@@ -332,12 +332,13 @@ HTML_TEMPLATE = """
     </div>
     
     <script>
-        // 获取并显示IP地址
+        // 获取并显示IP地址和端口
         fetch('/api/messages')
             .then(response => response.json())
             .then(data => {
                 // IP地址会在Python中获取，这里简化处理
                 document.getElementById('ipAddress').textContent = window.location.hostname;
+                document.getElementById('portNumber').textContent = window.location.port || '5001';
             });
         
         // 加载消息
