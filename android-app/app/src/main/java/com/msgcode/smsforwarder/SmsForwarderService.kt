@@ -83,6 +83,8 @@ class SmsForwarderService : Service() {
             updateNotification("❌ 配置错误")
             return
         }
+        
+        Log.d(TAG, "✅ 服务器配置正常: $serverIp:$serverPort")
 
         Thread {
             try {
@@ -95,7 +97,9 @@ class SmsForwarderService : Service() {
                 )
 
                 Log.d(TAG, "调用NetworkHelper.sendSms")
+                Log.d(TAG, "messageData: $messageData")
                 val success = NetworkHelper.sendSms(serverIp, serverPort, messageData)
+                Log.d(TAG, "NetworkHelper.sendSms 返回结果: $success")
 
                 if (success) {
                     Log.d(TAG, "✅ SMS转发成功!")

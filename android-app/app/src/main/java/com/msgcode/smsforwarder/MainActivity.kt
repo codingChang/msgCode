@@ -322,10 +322,25 @@ class MainActivity : AppCompatActivity() {
     
     private fun checkTestResult() {
         val debugLog = prefs.getString("debug_log", "")
-        if (debugLog?.contains("转发成功") == true) {
-            Toast.makeText(this, "🎉 测试成功！转发功能正常工作", Toast.LENGTH_LONG).show()
-        } else if (debugLog?.contains("转发失败") == true) {
-            Toast.makeText(this, "⚠️ 测试失败，请检查Mac服务器是否运行", Toast.LENGTH_LONG).show()
+        Log.d("MainActivity", "检查测试结果 - 调试日志: $debugLog")
+        
+        when {
+            debugLog?.contains("转发成功") == true -> {
+                Toast.makeText(this, "🎉 测试成功！转发功能正常工作", Toast.LENGTH_LONG).show()
+            }
+            debugLog?.contains("转发失败") == true -> {
+                Toast.makeText(this, "⚠️ 测试失败：$debugLog", Toast.LENGTH_LONG).show()
+            }
+            debugLog?.contains("配置缺失") == true -> {
+                Toast.makeText(this, "❌ 配置问题：$debugLog", Toast.LENGTH_LONG).show()
+            }
+            else -> {
+                Toast.makeText(this, "⏳ 还在处理中，请稍等...\n当前状态: $debugLog", Toast.LENGTH_LONG).show()
+                // 再等3秒检查一次
+                Handler(Looper.getMainLooper()).postDelayed({
+                    checkTestResult()
+                }, 3000)
+            }
         }
     }
 
