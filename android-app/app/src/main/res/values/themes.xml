@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.SmsForwarder" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+        <item name="colorPrimary">#667EEA</item>
+        <item name="colorPrimaryVariant">#5568D3</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondary">#764BA2</item>
+        <item name="colorSecondaryVariant">#5E3A82</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+    </style>
+</resources>
+
