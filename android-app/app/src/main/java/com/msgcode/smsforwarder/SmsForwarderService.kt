@@ -71,34 +71,50 @@ class SmsForwarderService : Service() {
     }
 
     private fun forwardSms(sender: String, content: String, timestamp: Long) {
-        Log.d(TAG, "Forwarding SMS from: $sender")
+        Log.d(TAG, "========== SmsForwarderService开始转发 ==========")
+        Log.d(TAG, "发件人: $sender")
+        Log.d(TAG, "内容: $content")
+        Log.d(TAG, "时间戳: $timestamp")
+        Log.d(TAG, "服务器: $serverIp:$serverPort")
 
         if (serverIp.isBlank() || serverPort.isBlank()) {
-            Log.e(TAG, "Server configuration is missing")
+            Log.e(TAG, "❌ 服务器配置缺失: IP='$serverIp', Port='$serverPort'")
+            saveDebugLog("❌ 转发失败: 服务器配置缺失\nIP: '$serverIp'\nPort: '$serverPort'")
+            updateNotification("❌ 配置错误")
             return
         }
 
         Thread {
             try {
+                updateNotification("📤 转发中...")
+                
                 val messageData = mapOf(
                     "sender" to sender,
                     "content" to content,
                     "timestamp" to timestamp.toString()
                 )
 
+                Log.d(TAG, "调用NetworkHelper.sendSms")
                 val success = NetworkHelper.sendSms(serverIp, serverPort, messageData)
 
                 if (success) {
-                    Log.d(TAG, "SMS forwarded successfully")
-                    updateNotification("✅ 最后转发：$sender")
+                    Log.d(TAG, "✅ SMS转发成功!")
+                    val successMsg = "✅ 转发成功!\n发件人: $sender\n内容: ${content.take(50)}${if(content.length > 50) "..." else ""}"
+                    saveDebugLog(successMsg)
+                    updateNotification("✅ 转发成功: $sender")
                 } else {
-                    Log.e(TAG, "Failed to forward SMS")
+                    Log.e(TAG, "❌ SMS转发失败")
+                    val failMsg = "❌ 转发失败\n发件人: $sender\n可能原因:\n- Mac服务器未运行\n- 网络连接问题\n- 服务器地址错误"
+                    saveDebugLog(failMsg)
                     updateNotification("❌ 转发失败")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error forwarding SMS", e)
-                updateNotification("❌ 发送错误")
+                Log.e(TAG, "❌ 转发过程出错", e)
+                val errorMsg = "❌ 转发异常: ${e.message}\n发件人: $sender\n服务器: $serverIp:$serverPort"
+                saveDebugLog(errorMsg)
+                updateNotification("❌ 转发异常")
             }
+            Log.d(TAG, "========== SmsForwarderService转发结束 ==========")
         }.start()
     }
 

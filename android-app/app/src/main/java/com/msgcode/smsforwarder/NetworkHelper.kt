@@ -26,25 +26,45 @@ object NetworkHelper {
     fun sendSms(serverIp: String, serverPort: String, messageData: Map<String, String>): Boolean {
         return try {
             val url = "http://$serverIp:$serverPort/api/sms"
-            val json = gson.toJson(messageData)
             
-            Log.d(TAG, "Sending SMS to: $url")
-            Log.d(TAG, "Data: $json")
+            // 转换timestamp为数字
+            val processedData = messageData.toMutableMap()
+            processedData["timestamp"]?.let { timestamp ->
+                try {
+                    processedData["timestamp"] = timestamp.toLong().toString()
+                } catch (e: Exception) {
+                    Log.w(TAG, "无法转换timestamp: $timestamp")
+                }
+            }
+            
+            val json = gson.toJson(processedData)
+            
+            Log.d(TAG, "========== NetworkHelper发送SMS ==========")
+            Log.d(TAG, "目标URL: $url")
+            Log.d(TAG, "发送数据: $json")
             
             val body = json.toRequestBody(JSON)
             val request = Request.Builder()
                 .url(url)
                 .post(body)
+                .addHeader("Content-Type", "application/json")
                 .build()
 
             client.newCall(request).execute().use { response ->
+                val responseBody = response.body?.string()
                 val success = response.isSuccessful
-                Log.d(TAG, "Response code: ${response.code}")
-                Log.d(TAG, "Response body: ${response.body?.string()}")
+                
+                Log.d(TAG, "响应状态码: ${response.code}")
+                Log.d(TAG, "响应内容: $responseBody")
+                Log.d(TAG, "发送${if(success) "成功" else "失败"}")
+                Log.d(TAG, "========== NetworkHelper结束 ==========")
+                
                 success
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error sending SMS", e)
+            Log.e(TAG, "❌ NetworkHelper发送SMS出错", e)
+            Log.e(TAG, "错误详情: ${e.message}")
+            Log.e(TAG, "服务器: $serverIp:$serverPort")
             false
         }
     }
