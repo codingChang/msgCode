@@ -23,6 +23,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvDebugLog: TextView
     private lateinit var btnTest: Button
     private lateinit var prefs: SharedPreferences
+    
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var updateRunnable: Runnable? = null
 
     companion object {
         private const val PREFS_NAME = "SmsForwarderPrefs"
@@ -227,14 +230,19 @@ class MainActivity : AppCompatActivity() {
         updateDebugInfo()
         
         // 启动定时刷新调试信息
-        val handler = android.os.Handler(mainLooper)
-        val runnable = object : Runnable {
+        updateRunnable = object : Runnable {
             override fun run() {
                 updateDebugInfo()
                 handler.postDelayed(this, 1000) // 每秒刷新
             }
         }
-        handler.post(runnable)
+        updateRunnable?.let { handler.post(it) }
+    }
+    
+    override fun onPause() {
+        super.onPause()
+        // 停止定时刷新
+        updateRunnable?.let { handler.removeCallbacks(it) }
     }
     
     private fun updateDebugInfo() {
