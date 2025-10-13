@@ -260,17 +260,29 @@ class MainActivity : AppCompatActivity() {
         }
         
         // 更新调试日志
-        val debugLog = prefs.getString("debug_log", "等待短信...")
+        val debugLog = prefs.getString("debug_log", null)
         val debugTime = prefs.getLong("debug_log_time", 0)
         val serviceEnabled = prefs.getBoolean("service_enabled", false)
         
+        // 检查权限状态
+        val hasSmsPermission = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.RECEIVE_SMS
+        ) == PackageManager.PERMISSION_GRANTED
+        
+        val hasReadSmsPermission = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.READ_SMS
+        ) == PackageManager.PERMISSION_GRANTED
+        
         val debugInfo = buildString {
             append("服务状态: ${if (serviceEnabled) "✅ 已启用" else "❌ 未启用"}\n")
-            if (debugTime > 0) {
-                val time = android.text.format.DateFormat.format("HH:mm:ss", debugTime)
+            append("接收短信权限: ${if (hasSmsPermission) "✅" else "❌"}\n")
+            append("读取短信权限: ${if (hasReadSmsPermission) "✅" else "❌"}\n")
+            append("\n")
+            if (debugLog != null && debugTime > 0) {
                 append("$debugLog")
             } else {
-                append("等待短信...")
+                append("📱 等待短信...\n")
+                append("💡 如果收到短信后这里没变化，说明BroadcastReceiver未触发")
             }
         }
         

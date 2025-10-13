@@ -17,9 +17,15 @@ class SmsReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d(TAG, "========== SmsReceiver.onReceive START ==========")
         Log.d(TAG, "Intent action: ${intent.action}")
+        Log.d(TAG, "Intent extras: ${intent.extras}")
+        
+        // 保存接收到broadcast的日志
+        val prefs = context.getSharedPreferences("SmsForwarderPrefs", Context.MODE_PRIVATE)
+        saveDebugLog(prefs, "收到广播: ${intent.action}")
         
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
             Log.d(TAG, "Not SMS_RECEIVED_ACTION, ignoring")
+            saveDebugLog(prefs, "不是短信广播，已忽略")
             return
         }
 
