@@ -27,24 +27,36 @@ class SmsForwarderService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "Service started")
 
-        // 从Intent获取服务器配置
-        intent?.let {
-            serverIp = it.getStringExtra("server_ip") ?: serverIp
-            serverPort = it.getStringExtra("server_port") ?: serverPort
+        try {
+            // 启动前台服务（必须在5秒内调用）
+            val notification = createNotification("短信转发服务运行中")
+            startForeground(NOTIFICATION_ID, notification)
 
-            // 如果是转发短信的Action
-            if (it.action == "FORWARD_SMS") {
-                val sender = it.getStringExtra("sender") ?: "未知"
-                val content = it.getStringExtra("content") ?: ""
-                val timestamp = it.getLongExtra("timestamp", System.currentTimeMillis())
+            // 从Intent获取服务器配置
+            intent?.let {
+                serverIp = it.getStringExtra("server_ip") ?: serverIp
+                serverPort = it.getStringExtra("server_port") ?: serverPort
 
-                forwardSms(sender, content, timestamp)
+                // 保存配置到SharedPreferences
+                val prefs = getSharedPreferences("SmsForwarderPrefs", Context.MODE_PRIVATE)
+                prefs.edit().apply {
+                    putString("server_ip", serverIp)
+                    putString("server_port", serverPort)
+                    apply()
+                }
+
+                // 如果是转发短信的Action
+                if (it.action == "FORWARD_SMS") {
+                    val sender = it.getStringExtra("sender") ?: "未知"
+                    val content = it.getStringExtra("content") ?: ""
+                    val timestamp = it.getLongExtra("timestamp", System.currentTimeMillis())
+
+                    forwardSms(sender, content, timestamp)
+                }
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting service", e)
         }
-
-        // 启动前台服务
-        val notification = createNotification("短信转发服务运行中")
-        startForeground(NOTIFICATION_ID, notification)
 
         return START_STICKY
     }

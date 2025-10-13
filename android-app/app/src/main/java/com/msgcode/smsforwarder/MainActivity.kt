@@ -70,7 +70,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadPreferences() {
-        etServerIp.setText(prefs.getString(KEY_SERVER_IP, "192.168.1."))
+        etServerIp.setText(prefs.getString(KEY_SERVER_IP, "192.168.31.124"))
         etServerPort.setText(prefs.getString(KEY_SERVER_PORT, "5001"))
         switchService.isChecked = prefs.getBoolean(KEY_SERVICE_ENABLED, false)
     }
@@ -140,21 +140,28 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        // 先保存配置
         savePreferences()
 
-        val intent = Intent(this, SmsForwarderService::class.java).apply {
-            putExtra("server_ip", serverIp)
-            putExtra("server_port", serverPort)
-        }
+        try {
+            val intent = Intent(this, SmsForwarderService::class.java).apply {
+                putExtra("server_ip", serverIp)
+                putExtra("server_port", serverPort)
+            }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
 
-        updateServiceStatus()
-        Toast.makeText(this, "短信转发服务已启动", Toast.LENGTH_SHORT).show()
+            updateServiceStatus()
+            Toast.makeText(this, "短信转发服务已启动", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(this, "启动服务失败：${e.message}", Toast.LENGTH_LONG).show()
+            switchService.isChecked = false
+        }
     }
 
     private fun stopForwardingService() {
