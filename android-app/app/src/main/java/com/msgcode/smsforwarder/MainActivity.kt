@@ -82,6 +82,7 @@ class MainActivity : AppCompatActivity() {
             putBoolean(KEY_SERVICE_ENABLED, switchService.isChecked)
             apply()
         }
+        Log.d("MainActivity", "Saved preferences: service_enabled=${switchService.isChecked}")
     }
 
     private fun checkPermissions(): Boolean {

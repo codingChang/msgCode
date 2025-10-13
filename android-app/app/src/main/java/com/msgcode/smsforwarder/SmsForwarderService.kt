@@ -35,24 +35,32 @@ class SmsForwarderService : Service() {
 
             // 从Intent获取服务器配置
             intent?.let {
-                serverIp = it.getStringExtra("server_ip") ?: serverIp
-                serverPort = it.getStringExtra("server_port") ?: serverPort
-
-                // 保存配置到SharedPreferences
-                val prefs = getSharedPreferences("SmsForwarderPrefs", Context.MODE_PRIVATE)
-                prefs.edit().apply {
-                    putString("server_ip", serverIp)
-                    putString("server_port", serverPort)
-                    apply()
-                }
-
-                // 如果是转发短信的Action
+                // 如果是转发短信的Action，直接转发
                 if (it.action == "FORWARD_SMS") {
+                    // 从SharedPreferences读取配置
+                    val prefs = getSharedPreferences("SmsForwarderPrefs", Context.MODE_PRIVATE)
+                    serverIp = prefs.getString("server_ip", "") ?: ""
+                    serverPort = prefs.getString("server_port", "") ?: ""
+                    
                     val sender = it.getStringExtra("sender") ?: "未知"
                     val content = it.getStringExtra("content") ?: ""
                     val timestamp = it.getLongExtra("timestamp", System.currentTimeMillis())
 
+                    Log.d(TAG, "Forwarding SMS - ServerIP: $serverIp, Port: $serverPort")
                     forwardSms(sender, content, timestamp)
+                } else {
+                    // 正常启动服务，保存配置
+                    serverIp = it.getStringExtra("server_ip") ?: serverIp
+                    serverPort = it.getStringExtra("server_port") ?: serverPort
+
+                    // 保存配置到SharedPreferences
+                    val prefs = getSharedPreferences("SmsForwarderPrefs", Context.MODE_PRIVATE)
+                    prefs.edit().apply {
+                        putString("server_ip", serverIp)
+                        putString("server_port", serverPort)
+                        apply()
+                    }
+                    Log.d(TAG, "Service started with IP: $serverIp, Port: $serverPort")
                 }
             }
         } catch (e: Exception) {
