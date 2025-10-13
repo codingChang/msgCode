@@ -6,6 +6,9 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
@@ -24,7 +27,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnTest: Button
     private lateinit var prefs: SharedPreferences
     
-    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val handler = Handler(Looper.getMainLooper())
     private var updateRunnable: Runnable? = null
 
     companion object {
