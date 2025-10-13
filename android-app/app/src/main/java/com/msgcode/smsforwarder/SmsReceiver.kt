@@ -15,29 +15,46 @@ class SmsReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        Log.d(TAG, "========== SmsReceiver.onReceive START ==========")
+        Log.d(TAG, "Intent action: ${intent.action}")
+        
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
+            Log.d(TAG, "Not SMS_RECEIVED_ACTION, ignoring")
             return
         }
+
+        Log.d(TAG, "✅ Received SMS_RECEIVED_ACTION broadcast")
 
         // 检查服务是否启用
         val prefs = context.getSharedPreferences("SmsForwarderPrefs", Context.MODE_PRIVATE)
         val serviceEnabled = prefs.getBoolean("service_enabled", false)
         
+        Log.d(TAG, "Service enabled status: $serviceEnabled")
+        
         if (!serviceEnabled) {
-            Log.d(TAG, "Service is disabled, ignoring SMS")
+            Log.d(TAG, "❌ Service is disabled, ignoring SMS")
+            saveDebugLog(prefs, "服务未启用，已忽略短信")
             return
         }
 
         try {
             val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
+            Log.d(TAG, "Number of SMS messages: ${messages.size}")
             
             for (smsMessage in messages) {
                 val sender = smsMessage.displayOriginatingAddress
                 val messageBody = smsMessage.messageBody
                 val timestamp = smsMessage.timestampMillis
 
-                Log.d(TAG, "Received SMS from: $sender")
-                Log.d(TAG, "Message: $messageBody")
+                Log.d(TAG, "========================================")
+                Log.d(TAG, "📱 SMS Details:")
+                Log.d(TAG, "   Sender: $sender")
+                Log.d(TAG, "   Content: $messageBody")
+                Log.d(TAG, "   Timestamp: $timestamp")
+                Log.d(TAG, "========================================")
+
+                // 保存调试信息
+                saveDebugLog(prefs, "收到短信\n发件人: $sender\n内容: ${messageBody.take(50)}")
 
                 // 发送到服务进行转发
                 val forwardIntent = Intent(context, SmsForwarderService::class.java).apply {
@@ -47,6 +64,8 @@ class SmsReceiver : BroadcastReceiver() {
                     putExtra("timestamp", timestamp)
                 }
 
+                Log.d(TAG, "🚀 Starting SmsForwarderService to forward SMS")
+                
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     context.startForegroundService(forwardIntent)
                 } else {
@@ -57,11 +76,32 @@ class SmsReceiver : BroadcastReceiver() {
                 prefs.edit().apply {
                     putString("last_sender", sender)
                     putLong("last_time", timestamp)
+                    putString("last_content", messageBody.take(100))
                     apply()
                 }
+                
+                Log.d(TAG, "✅ SMS processing completed")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error processing SMS", e)
+            Log.e(TAG, "❌ Error processing SMS", e)
+            saveDebugLog(prefs, "处理短信出错: ${e.message}")
+        }
+        
+        Log.d(TAG, "========== SmsReceiver.onReceive END ==========")
+    }
+    
+    private fun saveDebugLog(prefs: android.content.SharedPreferences, message: String) {
+        try {
+            val timestamp = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+                .format(java.util.Date())
+            val logMessage = "[$timestamp] $message"
+            prefs.edit().apply {
+                putString("debug_log", logMessage)
+                putLong("debug_log_time", System.currentTimeMillis())
+                apply()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error saving debug log", e)
         }
     }
 }

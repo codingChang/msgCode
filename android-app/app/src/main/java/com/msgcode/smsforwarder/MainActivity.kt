@@ -20,6 +20,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var switchService: SwitchMaterial
     private lateinit var tvStatus: TextView
     private lateinit var tvLastMessage: TextView
+    private lateinit var tvDebugLog: TextView
     private lateinit var btnTest: Button
     private lateinit var prefs: SharedPreferences
 
@@ -47,6 +48,7 @@ class MainActivity : AppCompatActivity() {
         switchService = findViewById(R.id.switchService)
         tvStatus = findViewById(R.id.tvStatus)
         tvLastMessage = findViewById(R.id.tvLastMessage)
+        tvDebugLog = findViewById(R.id.tvDebugLog)
         btnTest = findViewById(R.id.btnTest)
 
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
@@ -222,14 +224,46 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        updateDebugInfo()
+        
+        // 启动定时刷新调试信息
+        val handler = android.os.Handler(mainLooper)
+        val runnable = object : Runnable {
+            override fun run() {
+                updateDebugInfo()
+                handler.postDelayed(this, 1000) // 每秒刷新
+            }
+        }
+        handler.post(runnable)
+    }
+    
+    private fun updateDebugInfo() {
         // 更新最后一条消息显示
         val lastSender = prefs.getString("last_sender", null)
         val lastTime = prefs.getLong("last_time", 0)
+        val lastContent = prefs.getString("last_content", null)
         
         if (lastSender != null && lastTime > 0) {
             val timeStr = android.text.format.DateFormat.format("MM-dd HH:mm:ss", lastTime)
-            tvLastMessage.text = "最后转发：$lastSender ($timeStr)"
+            tvLastMessage.text = "最后转发：$lastSender ($timeStr)\n内容：$lastContent"
         }
+        
+        // 更新调试日志
+        val debugLog = prefs.getString("debug_log", "等待短信...")
+        val debugTime = prefs.getLong("debug_log_time", 0)
+        val serviceEnabled = prefs.getBoolean("service_enabled", false)
+        
+        val debugInfo = buildString {
+            append("服务状态: ${if (serviceEnabled) "✅ 已启用" else "❌ 未启用"}\n")
+            if (debugTime > 0) {
+                val time = android.text.format.DateFormat.format("HH:mm:ss", debugTime)
+                append("$debugLog")
+            } else {
+                append("等待短信...")
+            }
+        }
+        
+        tvDebugLog.text = debugInfo
     }
 }
 
