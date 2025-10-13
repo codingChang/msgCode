@@ -1,6 +1,7 @@
 package com.msgcode.smsforwarder
 
 import android.app.*
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
