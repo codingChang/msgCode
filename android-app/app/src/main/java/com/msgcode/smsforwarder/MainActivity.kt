@@ -459,94 +459,138 @@ class MainActivity : AppCompatActivity() {
         
         Toast.makeText(this, "📖 正在读取最近短信...", Toast.LENGTH_SHORT).show()
         
-        try {
-            val uri = Uri.parse("content://sms")  // 改为查询所有短信，不仅仅是收件箱
-            val projection = arrayOf("address", "body", "date", "type")
-            val sortOrder = "date DESC"  // 按时间倒序排列
-            
-            val cursor: Cursor? = contentResolver.query(uri, projection, null, null, sortOrder)
-            
-            val smsBuilder = StringBuilder()
-            smsBuilder.append("📱 最近5条短信:\n\n")
-            
-            var smsCount = 0
-            cursor?.use {
-                val addressIndex = it.getColumnIndex("address")
-                val bodyIndex = it.getColumnIndex("body") 
-                val dateIndex = it.getColumnIndex("date")
-                val typeIndex = it.getColumnIndex("type")
+        Thread {
+            try {
+                val uri = Uri.parse("content://sms")
+                val projection = arrayOf("address", "body", "date", "type", "_id")
+                val sortOrder = "date DESC"
                 
-                while (it.moveToNext() && smsCount < 5) {  // 限制只取5条
-                    val address = if (addressIndex >= 0) it.getString(addressIndex) else "未知"
-                    val body = if (bodyIndex >= 0) it.getString(bodyIndex) else "无内容"
-                    val date = if (dateIndex >= 0) it.getLong(dateIndex) else 0L
-                    val type = if (typeIndex >= 0) it.getInt(typeIndex) else 0
+                Log.d("MainActivity", "开始查询短信数据库")
+                Log.d("MainActivity", "URI: $uri")
+                Log.d("MainActivity", "排序: $sortOrder")
+                
+                val cursor: Cursor? = contentResolver.query(uri, projection, null, null, sortOrder)
+                
+                val smsBuilder = StringBuilder()
+                smsBuilder.append("📱 最近短信详情:\n\n")
+                
+                var smsCount = 0
+                var totalCount = 0
+                var inboxCount = 0
+                var outboxCount = 0
+                
+                cursor?.use {
+                    Log.d("MainActivity", "查询成功，cursor总数: ${it.count}")
                     
-                    // 过滤掉空内容的短信
-                    if (body.isNotBlank()) {
-                        smsCount++
-                        val dateFormat = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
-                        val timeStr = dateFormat.format(Date(date))
-                        val now = System.currentTimeMillis()
-                        val hoursAgo = (now - date) / (1000 * 60 * 60)
+                    val addressIndex = it.getColumnIndex("address")
+                    val bodyIndex = it.getColumnIndex("body") 
+                    val dateIndex = it.getColumnIndex("date")
+                    val typeIndex = it.getColumnIndex("type")
+                    val idIndex = it.getColumnIndex("_id")
+                    
+                    Log.d("MainActivity", "列索引 - address:$addressIndex, body:$bodyIndex, date:$dateIndex, type:$typeIndex, id:$idIndex")
+                    
+                    // 先统计所有短信
+                    while (it.moveToNext()) {
+                        totalCount++
+                        val type = if (typeIndex >= 0) it.getInt(typeIndex) else 0
+                        val body = if (bodyIndex >= 0) it.getString(bodyIndex) else ""
                         
-                        smsBuilder.append("$smsCount. 发件人: $address\n")
-                        smsBuilder.append("   时间: $timeStr (${hoursAgo}小时前)\n")
-                        smsBuilder.append("   内容: ${body.take(50)}${if(body.length > 50) "..." else ""}\n")
-                        smsBuilder.append("   类型: ${when(type) {
-                            1 -> "收件箱" 
-                            2 -> "发件箱"
-                            else -> "其他($type)"
-                        }}\n\n")
+                        when(type) {
+                            1 -> inboxCount++
+                            2 -> outboxCount++
+                        }
+                        
+                        Log.d("MainActivity", "短信 $totalCount: type=$type, hasBody=${body.isNotBlank()}, bodyLength=${body.length}")
+                        
+                        // 只取前10条进行详细显示
+                        if (smsCount < 10 && body.isNotBlank()) {
+                            smsCount++
+                            val address = if (addressIndex >= 0) it.getString(addressIndex) else "未知"
+                            val date = if (dateIndex >= 0) it.getLong(dateIndex) else 0L
+                            val id = if (idIndex >= 0) it.getLong(idIndex) else 0L
+                            
+                            val dateFormat = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
+                            val timeStr = dateFormat.format(Date(date))
+                            val now = System.currentTimeMillis()
+                            val minutesAgo = (now - date) / (1000 * 60)
+                            
+                            smsBuilder.append("$smsCount. ID:$id ${when(type) {
+                                1 -> "📥收件" 
+                                2 -> "📤发件"
+                                else -> "📋其他($type)"
+                            }}\n")
+                            smsBuilder.append("   发件人: $address\n")
+                            smsBuilder.append("   时间: $timeStr (${minutesAgo}分钟前)\n")
+                            smsBuilder.append("   内容: ${body.take(80)}${if(body.length > 80) "..." else ""}\n\n")
+                        }
                     }
+                } ?: run {
+                    Log.e("MainActivity", "查询返回null cursor")
                 }
-            }
-            
-            if (smsCount == 0) {
-                smsBuilder.append("❌ 没有找到短信\n")
-                smsBuilder.append("可能原因:\n")
-                smsBuilder.append("- 权限不足\n") 
-                smsBuilder.append("- 短信数据库为空\n")
-                smsBuilder.append("- 系统限制访问")
-            } else {
-                smsBuilder.append("✅ 成功读取到 $smsCount 条短信")
-            }
-            
-            val result = smsBuilder.toString()
-            Log.d("MainActivity", "短信读取结果:\n$result")
-            
-            // 保存到调试日志
-            prefs.edit().apply {
-                putString("debug_log", result)
-                putLong("debug_log_time", System.currentTimeMillis())
-                apply()
-            }
-            
-            // 显示对话框
-            android.app.AlertDialog.Builder(this)
-                .setTitle("📖 短信读取结果")
-                .setMessage(result)
-                .setPositiveButton("知道了", null)
-                .setNeutralButton("转发最新短信") { _, _ ->
-                    if (smsCount > 0) {
-                        forwardLatestSms()
-                    }
-                }
-                .show()
                 
-        } catch (e: Exception) {
-            Log.e("MainActivity", "读取短信失败", e)
-            val errorMsg = "❌ 读取短信失败: ${e.message}"
-            Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show()
-            
-            prefs.edit().apply {
-                putString("debug_log", errorMsg)
-                putLong("debug_log_time", System.currentTimeMillis())
-                apply()
+                // 添加统计信息
+                smsBuilder.append("📊 统计信息:\n")
+                smsBuilder.append("- 总短信数: $totalCount\n")
+                smsBuilder.append("- 收件箱: $inboxCount\n")
+                smsBuilder.append("- 发件箱: $outboxCount\n")
+                smsBuilder.append("- 显示详情: $smsCount 条\n\n")
+                
+                if (totalCount == 0) {
+                    smsBuilder.append("❌ 未找到任何短信\n")
+                    smsBuilder.append("可能原因:\n")
+                    smsBuilder.append("- 权限不足\n") 
+                    smsBuilder.append("- 短信数据库为空\n")
+                    smsBuilder.append("- 系统限制访问\n")
+                } else if (smsCount == 0) {
+                    smsBuilder.append("❌ 找到$totalCount条短信，但都没有内容\n")
+                } else {
+                    smsBuilder.append("✅ 成功读取并显示 $smsCount 条有内容的短信")
+                }
+                
+                val result = smsBuilder.toString()
+                Log.d("MainActivity", "短信读取完成:\n$result")
+                
+                runOnUiThread {
+                    // 保存到调试日志
+                    prefs.edit().apply {
+                        putString("debug_log", result)
+                        putLong("debug_log_time", System.currentTimeMillis())
+                        apply()
+                    }
+                    
+                    // 显示对话框
+                    android.app.AlertDialog.Builder(this@MainActivity)
+                        .setTitle("📖 短信读取结果")
+                        .setMessage(result)
+                        .setPositiveButton("知道了", null)
+                        .setNeutralButton("转发最新短信") { _, _ ->
+                            if (inboxCount > 0) {
+                                forwardLatestSms()
+                            } else {
+                                Toast.makeText(this@MainActivity, "❌ 没有收件箱短信可转发", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        .show()
+                }
+                
+            } catch (e: Exception) {
+                Log.e("MainActivity", "读取短信失败", e)
+                val errorMsg = "❌ 读取短信失败: ${e.message}\n\n详细错误:\n${e.toString()}"
+                
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "读取短信出错: ${e.message}", Toast.LENGTH_LONG).show()
+                    
+                    prefs.edit().apply {
+                        putString("debug_log", errorMsg)
+                        putLong("debug_log_time", System.currentTimeMillis())
+                        apply()
+                    }
+                }
             }
-        }
+        }.start()
         
-        Log.d("MainActivity", "========== 短信读取结束 ==========")
+        Log.d("MainActivity", "========== 短信读取线程已启动 ==========")
     }
     
     private fun forwardLatestSms() {
