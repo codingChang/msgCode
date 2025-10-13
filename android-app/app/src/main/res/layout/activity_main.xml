@@ -132,7 +132,7 @@
                     android:layout_marginTop="8dp"
                     android:backgroundTint="#f59e0b"
                     android:padding="12dp"
-                    android:text="🔧 设为默认短信应用"
+                    android:text="⚙️ 荣耀手机权限设置"
                     android:textColor="#FFF"
                     android:textSize="16sp" />
             </LinearLayout>

@@ -87,7 +87,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnSetDefaultSms.setOnClickListener {
-            requestDefaultSmsApp()
+            showHonorSettings()
         }
     }
 
@@ -243,8 +243,25 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun simulateSmsReceived() {
-        Log.d("MainActivity", "Simulating SMS received")
-        Toast.makeText(this, "模拟短信接收...", Toast.LENGTH_SHORT).show()
+        Log.d("MainActivity", "========== 开始模拟短信测试 ==========")
+        
+        val serverIp = etServerIp.text.toString().trim()
+        val serverPort = etServerPort.text.toString().trim()
+        
+        // 检查输入
+        if (serverIp.isEmpty() || serverPort.isEmpty()) {
+            Toast.makeText(this, "❌ 请先填写服务器IP和端口", Toast.LENGTH_LONG).show()
+            return
+        }
+        
+        Toast.makeText(this, "🧪 开始模拟短信测试...", Toast.LENGTH_SHORT).show()
+        
+        // 更新调试日志
+        prefs.edit().apply {
+            putString("debug_log", "🧪 开始模拟短信测试\n目标: $serverIp:$serverPort\n发件人: 10086\n内容: 【测试】您的验证码是123456")
+            putLong("debug_log_time", System.currentTimeMillis())
+            apply()
+        }
         
         // 直接调用转发服务，模拟短信接收
         val intent = Intent(this, SmsForwarderService::class.java).apply {
@@ -255,22 +272,42 @@ class MainActivity : AppCompatActivity() {
         }
 
         try {
+            Log.d("MainActivity", "启动SmsForwarderService进行模拟测试")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 startForegroundService(intent)
             } else {
                 startService(intent)
             }
             
-            // 保存调试日志
+            Toast.makeText(this, "✅ 模拟短信已发送\n请检查Mac浏览器: http://$serverIp:$serverPort", Toast.LENGTH_LONG).show()
+            
+            // 3秒后检查结果
+            Handler(Looper.getMainLooper()).postDelayed({
+                checkTestResult()
+            }, 3000)
+            
+        } catch (e: Exception) {
+            Log.e("MainActivity", "模拟短信发送失败", e)
+            val errorMsg = "❌ 模拟发送失败：${e.message}"
+            Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show()
+            
+            // 保存错误日志
             prefs.edit().apply {
-                putString("debug_log", "手动模拟短信接收\n发件人: 10086\n内容: 【测试】您的验证码是123456")
+                putString("debug_log", errorMsg)
                 putLong("debug_log_time", System.currentTimeMillis())
                 apply()
             }
-            
-            Toast.makeText(this, "✅ 模拟短信已发送，请查看Mac浏览器", Toast.LENGTH_LONG).show()
-        } catch (e: Exception) {
-            Toast.makeText(this, "❌ 模拟发送失败：${e.message}", Toast.LENGTH_LONG).show()
+        }
+        
+        Log.d("MainActivity", "========== 模拟短信测试结束 ==========")
+    }
+    
+    private fun checkTestResult() {
+        val debugLog = prefs.getString("debug_log", "")
+        if (debugLog?.contains("转发成功") == true) {
+            Toast.makeText(this, "🎉 测试成功！转发功能正常工作", Toast.LENGTH_LONG).show()
+        } else if (debugLog?.contains("转发失败") == true) {
+            Toast.makeText(this, "⚠️ 测试失败，请检查Mac服务器是否运行", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -319,22 +356,17 @@ class MainActivity : AppCompatActivity() {
                this, Manifest.permission.READ_SMS
            ) == PackageManager.PERMISSION_GRANTED
            
-           val isDefaultSms = isDefaultSmsApp()
-           
            val debugInfo = buildString {
                append("服务状态: ${if (serviceEnabled) "✅ 已启用" else "❌ 未启用"}\n")
                append("接收短信权限: ${if (hasSmsPermission) "✅" else "❌"}\n")
                append("读取短信权限: ${if (hasReadSmsPermission) "✅" else "❌"}\n")
-               append("默认短信应用: ${if (isDefaultSms) "✅" else "❌ (荣耀手机建议设置)"}\n")
                append("\n")
                if (debugLog != null && debugTime > 0) {
                    append("$debugLog")
                } else {
                    append("📱 等待短信...\n")
-                   if (!isDefaultSms) {
-                       append("💡 荣耀手机建议点击'设为默认短信应用'\n")
-                   }
-                   append("💡 如果收到短信后这里没变化，说明BroadcastReceiver未触发")
+                   append("💡 荣耀手机如收不到短信，点击'权限设置'按钮\n")
+                   append("💡 先点击'模拟短信测试'检查转发功能")
                }
            }
         
@@ -349,24 +381,43 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    private fun requestDefaultSmsApp() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            if (!isDefaultSmsApp()) {
-                val intent = Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT)
-                intent.putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)
+    private fun showHonorSettings() {
+        val message = """
+🔧 荣耀手机权限设置指南
+
+⭐ 必须设置 - 电池管理：
+设置 → 电池 → 更多电池设置 → 应用启动管理 → 短信转发器
+选择"手动管理"：
+✅ 允许自启动
+✅ 允许关联启动  
+✅ 允许后台活动
+
+📱 通知权限：
+设置 → 应用和服务 → 应用管理 → 短信转发器
+→ 通知 → 允许通知
+
+🛡️ 受保护应用：
+手机管家 → 应用启动管理 → 短信转发器 → 设为受保护
+
+💡 完成设置后，重启应用并测试！
+        """.trimIndent()
+        
+        android.app.AlertDialog.Builder(this)
+            .setTitle("荣耀手机设置指南")
+            .setMessage(message)
+            .setPositiveButton("知道了") { dialog, _ ->
+                dialog.dismiss()
+                // 打开应用设置页面
                 try {
+                    val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    intent.data = android.net.Uri.parse("package:$packageName")
                     startActivity(intent)
-                    Toast.makeText(this, "请在弹出的设置页面中选择'短信转发器'", Toast.LENGTH_LONG).show()
                 } catch (e: Exception) {
-                    Toast.makeText(this, "无法打开默认短信应用设置：${e.message}", Toast.LENGTH_LONG).show()
-                    Log.e("MainActivity", "Error requesting default SMS app", e)
+                    Toast.makeText(this, "请手动进入设置", Toast.LENGTH_SHORT).show()
                 }
-            } else {
-                Toast.makeText(this, "✅ 已经是默认短信应用", Toast.LENGTH_SHORT).show()
             }
-        } else {
-            Toast.makeText(this, "当前Android版本不支持设置默认短信应用", Toast.LENGTH_LONG).show()
-        }
+            .setNegativeButton("取消", null)
+            .show()
     }
 }
 
