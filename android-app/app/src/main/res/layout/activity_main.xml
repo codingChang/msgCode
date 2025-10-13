@@ -103,16 +103,36 @@
                     android:padding="12dp"
                     android:textSize="16sp" />
 
-                <Button
-                    android:id="@+id/btnTest"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:backgroundTint="#667EEA"
-                    android:padding="12dp"
-                    android:text="🔍 测试连接"
-                    android:textColor="#FFF"
-                    android:textSize="16sp" />
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnTest"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="8dp"
+                        android:backgroundTint="#667EEA"
+                        android:padding="12dp"
+                        android:text="🔍 测试连接"
+                        android:textColor="#FFF"
+                        android:textSize="14sp" />
+
+                    <Button
+                        android:id="@+id/btnTestSms"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="8dp"
+                        android:backgroundTint="#FF9800"
+                        android:padding="12dp"
+                        android:text="📱 模拟短信"
+                        android:textColor="#FFF"
+                        android:textSize="14sp" />
+                </LinearLayout>
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
