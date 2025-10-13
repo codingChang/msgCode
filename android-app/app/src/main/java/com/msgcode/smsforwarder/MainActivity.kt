@@ -264,6 +264,14 @@ class MainActivity : AppCompatActivity() {
             return
         }
         
+        // ⚡ 关键修复：先保存配置到SharedPreferences
+        Log.d("MainActivity", "保存配置到SharedPreferences: $serverIp:$serverPort")
+        prefs.edit().apply {
+            putString(KEY_SERVER_IP, serverIp)
+            putString(KEY_SERVER_PORT, serverPort)
+            apply()
+        }
+        
         Toast.makeText(this, "🧪 开始模拟短信测试...", Toast.LENGTH_SHORT).show()
         
         // 更新调试日志
