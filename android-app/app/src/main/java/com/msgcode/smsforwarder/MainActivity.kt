@@ -264,58 +264,52 @@ class MainActivity : AppCompatActivity() {
             return
         }
         
-        // ⚡ 关键修复：先保存配置到SharedPreferences
-        Log.d("MainActivity", "保存配置到SharedPreferences: $serverIp:$serverPort")
-        prefs.edit().apply {
-            putString(KEY_SERVER_IP, serverIp)
-            putString(KEY_SERVER_PORT, serverPort)
-            apply()
-        }
-        
         Toast.makeText(this, "🧪 开始模拟短信测试...", Toast.LENGTH_SHORT).show()
         
-        // 更新调试日志
-        prefs.edit().apply {
-            putString("debug_log", "🧪 开始模拟短信测试\n目标: $serverIp:$serverPort\n发件人: 10086\n内容: 【测试】您的验证码是123456")
-            putLong("debug_log_time", System.currentTimeMillis())
-            apply()
-        }
-        
-        // 直接调用转发服务，模拟短信接收
-        val intent = Intent(this, SmsForwarderService::class.java).apply {
-            action = "FORWARD_SMS"
-            putExtra("sender", "10086")
-            putExtra("content", "【测试】您的验证码是123456，请在5分钟内使用。")
-            putExtra("timestamp", System.currentTimeMillis())
-        }
+        // 💡 直接用和测试连接一样的方式！
+        Thread {
+            try {
+                val testMessage = mapOf(
+                    "sender" to "10086",
+                    "content" to "【测试】您的验证码是123456，请在5分钟内使用。",
+                    "timestamp" to System.currentTimeMillis().toString()
+                )
 
-        try {
-            Log.d("MainActivity", "启动SmsForwarderService进行模拟测试")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
+                Log.d("MainActivity", "直接调用NetworkHelper.sendSms")
+                Log.d("MainActivity", "消息内容: $testMessage")
+                
+                val success = NetworkHelper.sendSms(serverIp, serverPort, testMessage)
+
+                runOnUiThread {
+                    if (success) {
+                        Toast.makeText(this@MainActivity, "🎉 模拟短信发送成功！请查看Mac浏览器", Toast.LENGTH_LONG).show()
+                        // 更新调试日志
+                        prefs.edit().apply {
+                            putString("debug_log", "✅ 模拟短信转发成功!\n发件人: 10086\n内容: 【测试】您的验证码是123456")
+                            putLong("debug_log_time", System.currentTimeMillis())
+                            apply()
+                        }
+                    } else {
+                        Toast.makeText(this@MainActivity, "❌ 模拟短信发送失败，请检查Mac服务器", Toast.LENGTH_LONG).show()
+                        prefs.edit().apply {
+                            putString("debug_log", "❌ 模拟短信转发失败\n目标: $serverIp:$serverPort\n请检查Mac服务器是否运行")
+                            putLong("debug_log_time", System.currentTimeMillis())
+                            apply()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "模拟短信测试出错", e)
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "❌ 错误：${e.message}", Toast.LENGTH_LONG).show()
+                    prefs.edit().apply {
+                        putString("debug_log", "❌ 模拟短信测试异常: ${e.message}")
+                        putLong("debug_log_time", System.currentTimeMillis())
+                        apply()
+                    }
+                }
             }
-            
-            Toast.makeText(this, "✅ 模拟短信已发送\n请检查Mac浏览器: http://$serverIp:$serverPort", Toast.LENGTH_LONG).show()
-            
-            // 3秒后检查结果
-            Handler(Looper.getMainLooper()).postDelayed({
-                checkTestResult()
-            }, 3000)
-            
-        } catch (e: Exception) {
-            Log.e("MainActivity", "模拟短信发送失败", e)
-            val errorMsg = "❌ 模拟发送失败：${e.message}"
-            Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show()
-            
-            // 保存错误日志
-            prefs.edit().apply {
-                putString("debug_log", errorMsg)
-                putLong("debug_log_time", System.currentTimeMillis())
-                apply()
-            }
-        }
+        }.start()
         
         Log.d("MainActivity", "========== 模拟短信测试结束 ==========")
     }
