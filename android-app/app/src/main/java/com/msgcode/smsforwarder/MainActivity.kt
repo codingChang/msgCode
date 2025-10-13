@@ -25,6 +25,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvLastMessage: TextView
     private lateinit var tvDebugLog: TextView
     private lateinit var btnTest: Button
+    private lateinit var btnSimulateSms: Button
+    private lateinit var btnSetDefaultSms: Button
     private lateinit var prefs: SharedPreferences
     
     private val handler = Handler(Looper.getMainLooper())
@@ -56,6 +58,8 @@ class MainActivity : AppCompatActivity() {
         tvLastMessage = findViewById(R.id.tvLastMessage)
         tvDebugLog = findViewById(R.id.tvDebugLog)
         btnTest = findViewById(R.id.btnTest)
+        btnSimulateSms = findViewById(R.id.btnSimulateSms)
+        btnSetDefaultSms = findViewById(R.id.btnSetDefaultSms)
 
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
 
@@ -74,6 +78,14 @@ class MainActivity : AppCompatActivity() {
 
         btnTest.setOnClickListener {
             testConnection()
+        }
+
+        btnSimulateSms.setOnClickListener {
+            simulateSmsReceived()
+        }
+
+        btnSetDefaultSms.setOnClickListener {
+            requestDefaultSmsApp()
         }
     }
 
@@ -227,6 +239,38 @@ class MainActivity : AppCompatActivity() {
             }
         }.start()
     }
+    
+    private fun simulateSmsReceived() {
+        Log.d("MainActivity", "Simulating SMS received")
+        Toast.makeText(this, "模拟短信接收...", Toast.LENGTH_SHORT).show()
+        
+        // 直接调用转发服务，模拟短信接收
+        val intent = Intent(this, SmsForwarderService::class.java).apply {
+            action = "FORWARD_SMS"
+            putExtra("sender", "10086")
+            putExtra("content", "【测试】您的验证码是123456，请在5分钟内使用。")
+            putExtra("timestamp", System.currentTimeMillis())
+        }
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+            
+            // 保存调试日志
+            prefs.edit().apply {
+                putString("debug_log", "手动模拟短信接收\n发件人: 10086\n内容: 【测试】您的验证码是123456")
+                putLong("debug_log_time", System.currentTimeMillis())
+                apply()
+            }
+            
+            Toast.makeText(this, "✅ 模拟短信已发送，请查看Mac浏览器", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "❌ 模拟发送失败：${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
 
     override fun onResume() {
         super.onResume()
@@ -264,27 +308,33 @@ class MainActivity : AppCompatActivity() {
         val debugTime = prefs.getLong("debug_log_time", 0)
         val serviceEnabled = prefs.getBoolean("service_enabled", false)
         
-        // 检查权限状态
-        val hasSmsPermission = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.RECEIVE_SMS
-        ) == PackageManager.PERMISSION_GRANTED
-        
-        val hasReadSmsPermission = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.READ_SMS
-        ) == PackageManager.PERMISSION_GRANTED
-        
-        val debugInfo = buildString {
-            append("服务状态: ${if (serviceEnabled) "✅ 已启用" else "❌ 未启用"}\n")
-            append("接收短信权限: ${if (hasSmsPermission) "✅" else "❌"}\n")
-            append("读取短信权限: ${if (hasReadSmsPermission) "✅" else "❌"}\n")
-            append("\n")
-            if (debugLog != null && debugTime > 0) {
-                append("$debugLog")
-            } else {
-                append("📱 等待短信...\n")
-                append("💡 如果收到短信后这里没变化，说明BroadcastReceiver未触发")
-            }
-        }
+           // 检查权限状态
+           val hasSmsPermission = ContextCompat.checkSelfPermission(
+               this, Manifest.permission.RECEIVE_SMS
+           ) == PackageManager.PERMISSION_GRANTED
+           
+           val hasReadSmsPermission = ContextCompat.checkSelfPermission(
+               this, Manifest.permission.READ_SMS
+           ) == PackageManager.PERMISSION_GRANTED
+           
+           val isDefaultSms = isDefaultSmsApp()
+           
+           val debugInfo = buildString {
+               append("服务状态: ${if (serviceEnabled) "✅ 已启用" else "❌ 未启用"}\n")
+               append("接收短信权限: ${if (hasSmsPermission) "✅" else "❌"}\n")
+               append("读取短信权限: ${if (hasReadSmsPermission) "✅" else "❌"}\n")
+               append("默认短信应用: ${if (isDefaultSms) "✅" else "❌ (荣耀手机建议设置)"}\n")
+               append("\n")
+               if (debugLog != null && debugTime > 0) {
+                   append("$debugLog")
+               } else {
+                   append("📱 等待短信...\n")
+                   if (!isDefaultSms) {
+                       append("💡 荣耀手机建议点击'设为默认短信应用'\n")
+                   }
+                   append("💡 如果收到短信后这里没变化，说明BroadcastReceiver未触发")
+               }
+           }
         
         tvDebugLog.text = debugInfo
     }
