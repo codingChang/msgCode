@@ -443,9 +443,9 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "📖 正在读取最近短信...", Toast.LENGTH_SHORT).show()
         
         try {
-            val uri = Uri.parse("content://sms/inbox")
+            val uri = Uri.parse("content://sms")  // 改为查询所有短信，不仅仅是收件箱
             val projection = arrayOf("address", "body", "date", "type")
-            val sortOrder = "date DESC LIMIT 5"  // 获取最近5条短信
+            val sortOrder = "date DESC"  // 按时间倒序排列
             
             val cursor: Cursor? = contentResolver.query(uri, projection, null, null, sortOrder)
             
@@ -459,20 +459,29 @@ class MainActivity : AppCompatActivity() {
                 val dateIndex = it.getColumnIndex("date")
                 val typeIndex = it.getColumnIndex("type")
                 
-                while (it.moveToNext()) {
-                    smsCount++
+                while (it.moveToNext() && smsCount < 5) {  // 限制只取5条
                     val address = if (addressIndex >= 0) it.getString(addressIndex) else "未知"
                     val body = if (bodyIndex >= 0) it.getString(bodyIndex) else "无内容"
                     val date = if (dateIndex >= 0) it.getLong(dateIndex) else 0L
                     val type = if (typeIndex >= 0) it.getInt(typeIndex) else 0
                     
-                    val dateFormat = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
-                    val timeStr = dateFormat.format(Date(date))
-                    
-                    smsBuilder.append("$smsCount. 发件人: $address\n")
-                    smsBuilder.append("   时间: $timeStr\n")
-                    smsBuilder.append("   内容: ${body.take(50)}${if(body.length > 50) "..." else ""}\n")
-                    smsBuilder.append("   类型: ${if(type == 1) "收件箱" else "其他"}\n\n")
+                    // 过滤掉空内容的短信
+                    if (body.isNotBlank()) {
+                        smsCount++
+                        val dateFormat = SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault())
+                        val timeStr = dateFormat.format(Date(date))
+                        val now = System.currentTimeMillis()
+                        val hoursAgo = (now - date) / (1000 * 60 * 60)
+                        
+                        smsBuilder.append("$smsCount. 发件人: $address\n")
+                        smsBuilder.append("   时间: $timeStr (${hoursAgo}小时前)\n")
+                        smsBuilder.append("   内容: ${body.take(50)}${if(body.length > 50) "..." else ""}\n")
+                        smsBuilder.append("   类型: ${when(type) {
+                            1 -> "收件箱" 
+                            2 -> "发件箱"
+                            else -> "其他($type)"
+                        }}\n\n")
+                    }
                 }
             }
             
@@ -524,40 +533,60 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun forwardLatestSms() {
+        Log.d("MainActivity", "========== 开始转发最新短信 ==========")
         try {
-            val uri = Uri.parse("content://sms/inbox")
-            val projection = arrayOf("address", "body", "date")
-            val sortOrder = "date DESC LIMIT 1"
+            val uri = Uri.parse("content://sms")  // 查询所有短信
+            val projection = arrayOf("address", "body", "date", "type")
+            val selection = "type = 1"  // 只查询收件箱短信
+            val sortOrder = "date DESC"
             
-            val cursor: Cursor? = contentResolver.query(uri, projection, null, null, sortOrder)
+            val cursor: Cursor? = contentResolver.query(uri, projection, selection, null, sortOrder)
             
             cursor?.use {
-                if (it.moveToFirst()) {
+                // 查找第一条有内容的收件箱短信
+                while (it.moveToNext()) {
                     val addressIndex = it.getColumnIndex("address")
                     val bodyIndex = it.getColumnIndex("body")
                     val dateIndex = it.getColumnIndex("date")
+                    val typeIndex = it.getColumnIndex("type")
                     
                     val address = if (addressIndex >= 0) it.getString(addressIndex) else "未知"
                     val body = if (bodyIndex >= 0) it.getString(bodyIndex) else "无内容"
                     val date = if (dateIndex >= 0) it.getLong(dateIndex) else System.currentTimeMillis()
+                    val type = if (typeIndex >= 0) it.getInt(typeIndex) else 0
                     
-                    Log.d("MainActivity", "转发最新短信: $address - $body")
-                    
-                    // 调用转发服务
-                    val intent = Intent(this, SmsForwarderService::class.java).apply {
-                        action = "FORWARD_SMS"
-                        putExtra("sender", address)
-                        putExtra("content", body)
-                        putExtra("timestamp", date)
+                    // 确保是收件箱短信且有内容
+                    if (type == 1 && body.isNotBlank()) {
+                        Log.d("MainActivity", "找到最新短信:")
+                        Log.d("MainActivity", "  发件人: $address")
+                        Log.d("MainActivity", "  内容: $body")
+                        Log.d("MainActivity", "  时间: ${Date(date)}")
+                        
+                        // 更新调试日志
+                        prefs.edit().apply {
+                            putString("debug_log", "🚀 转发真实短信\n发件人: $address\n内容: ${body.take(50)}\n时间: ${SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault()).format(Date(date))}")
+                            putLong("debug_log_time", System.currentTimeMillis())
+                            apply()
+                        }
+                        
+                        // 调用转发服务
+                        val intent = Intent(this, SmsForwarderService::class.java).apply {
+                            action = "FORWARD_SMS"
+                            putExtra("sender", address)
+                            putExtra("content", body)
+                            putExtra("timestamp", date)
+                        }
+                        
+                        Log.d("MainActivity", "启动SmsForwarderService转发真实短信")
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(intent)
+                        } else {
+                            startService(intent)
+                        }
+                        
+                        Toast.makeText(this, "🚀 转发: $address\n${body.take(30)}...", Toast.LENGTH_LONG).show()
+                        break // 只转发第一条找到的短信
                     }
-                    
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        startForegroundService(intent)
-                    } else {
-                        startService(intent)
-                    }
-                    
-                    Toast.makeText(this, "🚀 正在转发最新短信...", Toast.LENGTH_SHORT).show()
                 }
             }
         } catch (e: Exception) {

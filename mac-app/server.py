@@ -448,7 +448,7 @@ if __name__ == '__main__':
             print(f"💡 解决方案：")
             print(f"   1. 使用其他端口: python3 server.py {port+1}")
             print(f"   2. 查看占用进程: lsof -i :{port}")
-            if port == 5000:
+            if port == 5001:
                 print(f"   3. macOS用户：关闭AirPlay Receiver")
                 print(f"      系统设置 → 通用 → 隔空播放与接力 → 关闭隔空播放接收器")
         else:

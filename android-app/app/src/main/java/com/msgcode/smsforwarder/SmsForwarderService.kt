@@ -149,6 +149,20 @@ class SmsForwarderService : Service() {
         return null
     }
 
+    private fun saveDebugLog(message: String) {
+        try {
+            val prefs = getSharedPreferences("SmsForwarderPrefs", Context.MODE_PRIVATE)
+            prefs.edit().apply {
+                putString("debug_log", message)
+                putLong("debug_log_time", System.currentTimeMillis())
+                apply()
+            }
+            Log.d(TAG, "调试日志已保存: $message")
+        } catch (e: Exception) {
+            Log.e(TAG, "保存调试日志失败", e)
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "Service destroyed")
