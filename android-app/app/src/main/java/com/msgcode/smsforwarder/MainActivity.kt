@@ -551,65 +551,95 @@ class MainActivity : AppCompatActivity() {
     
     private fun forwardLatestSms() {
         Log.d("MainActivity", "========== 开始转发最新短信 ==========")
-        try {
-            val uri = Uri.parse("content://sms")  // 查询所有短信
-            val projection = arrayOf("address", "body", "date", "type")
-            val selection = "type = 1"  // 只查询收件箱短信
-            val sortOrder = "date DESC"
-            
-            val cursor: Cursor? = contentResolver.query(uri, projection, selection, null, sortOrder)
-            
-            cursor?.use {
-                // 查找第一条有内容的收件箱短信
-                while (it.moveToNext()) {
-                    val addressIndex = it.getColumnIndex("address")
-                    val bodyIndex = it.getColumnIndex("body")
-                    val dateIndex = it.getColumnIndex("date")
-                    val typeIndex = it.getColumnIndex("type")
-                    
-                    val address = if (addressIndex >= 0) it.getString(addressIndex) else "未知"
-                    val body = if (bodyIndex >= 0) it.getString(bodyIndex) else "无内容"
-                    val date = if (dateIndex >= 0) it.getLong(dateIndex) else System.currentTimeMillis()
-                    val type = if (typeIndex >= 0) it.getInt(typeIndex) else 0
-                    
-                    // 确保是收件箱短信且有内容
-                    if (type == 1 && body.isNotBlank()) {
-                        Log.d("MainActivity", "找到最新短信:")
-                        Log.d("MainActivity", "  发件人: $address")
-                        Log.d("MainActivity", "  内容: $body")
-                        Log.d("MainActivity", "  时间: ${Date(date)}")
+        
+        val serverIp = etServerIp.text.toString().trim()
+        val serverPort = etServerPort.text.toString().trim()
+        
+        if (serverIp.isEmpty() || serverPort.isEmpty()) {
+            Toast.makeText(this, "❌ 请先配置服务器地址", Toast.LENGTH_LONG).show()
+            return
+        }
+        
+        Thread {
+            try {
+                val uri = Uri.parse("content://sms")  // 查询所有短信
+                val projection = arrayOf("address", "body", "date", "type")
+                val selection = "type = 1"  // 只查询收件箱短信
+                val sortOrder = "date DESC"
+                
+                val cursor: Cursor? = contentResolver.query(uri, projection, selection, null, sortOrder)
+                
+                cursor?.use {
+                    // 查找第一条有内容的收件箱短信
+                    while (it.moveToNext()) {
+                        val addressIndex = it.getColumnIndex("address")
+                        val bodyIndex = it.getColumnIndex("body")
+                        val dateIndex = it.getColumnIndex("date")
+                        val typeIndex = it.getColumnIndex("type")
                         
-                        // 更新调试日志
-                        prefs.edit().apply {
-                            putString("debug_log", "🚀 转发真实短信\n发件人: $address\n内容: ${body.take(50)}\n时间: ${SimpleDateFormat("MM-dd HH:mm:ss", Locale.getDefault()).format(Date(date))}")
-                            putLong("debug_log_time", System.currentTimeMillis())
-                            apply()
+                        val address = if (addressIndex >= 0) it.getString(addressIndex) else "未知"
+                        val body = if (bodyIndex >= 0) it.getString(bodyIndex) else "无内容"
+                        val date = if (dateIndex >= 0) it.getLong(dateIndex) else System.currentTimeMillis()
+                        val type = if (typeIndex >= 0) it.getInt(typeIndex) else 0
+                        
+                        // 确保是收件箱短信且有内容
+                        if (type == 1 && body.isNotBlank()) {
+                            Log.d("MainActivity", "找到最新短信:")
+                            Log.d("MainActivity", "  发件人: $address")
+                            Log.d("MainActivity", "  内容: $body")
+                            Log.d("MainActivity", "  时间: ${Date(date)}")
+                            
+                            // 💡 直接用和模拟短信测试一样的方式！
+                            val smsData = mapOf(
+                                "sender" to address,
+                                "content" to body,
+                                "timestamp" to date.toString()
+                            )
+                            
+                            Log.d("MainActivity", "直接调用NetworkHelper.sendSms转发真实短信")
+                            Log.d("MainActivity", "转发数据: $smsData")
+                            
+                            val success = NetworkHelper.sendSms(serverIp, serverPort, smsData)
+                            
+                            runOnUiThread {
+                                if (success) {
+                                    Toast.makeText(this@MainActivity, "🎉 转发成功: $address\n${body.take(30)}...", Toast.LENGTH_LONG).show()
+                                    
+                                    // 更新调试日志
+                                    prefs.edit().apply {
+                                        putString("debug_log", "✅ 真实短信转发成功!\n发件人: $address\n内容: ${body.take(50)}${if(body.length > 50) "..." else ""}")
+                                        putLong("debug_log_time", System.currentTimeMillis())
+                                        apply()
+                                    }
+                                } else {
+                                    Toast.makeText(this@MainActivity, "❌ 转发失败，请检查Mac服务器", Toast.LENGTH_LONG).show()
+                                    
+                                    prefs.edit().apply {
+                                        putString("debug_log", "❌ 真实短信转发失败\n发件人: $address\n目标: $serverIp:$serverPort")
+                                        putLong("debug_log_time", System.currentTimeMillis())
+                                        apply()
+                                    }
+                                }
+                            }
+                            
+                            break // 只转发第一条找到的短信
                         }
-                        
-                        // 调用转发服务
-                        val intent = Intent(this, SmsForwarderService::class.java).apply {
-                            action = "FORWARD_SMS"
-                            putExtra("sender", address)
-                            putExtra("content", body)
-                            putExtra("timestamp", date)
-                        }
-                        
-                        Log.d("MainActivity", "启动SmsForwarderService转发真实短信")
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            startForegroundService(intent)
-                        } else {
-                            startService(intent)
-                        }
-                        
-                        Toast.makeText(this, "🚀 转发: $address\n${body.take(30)}...", Toast.LENGTH_LONG).show()
-                        break // 只转发第一条找到的短信
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "转发最新短信失败", e)
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "❌ 转发异常: ${e.message}", Toast.LENGTH_LONG).show()
+                    prefs.edit().apply {
+                        putString("debug_log", "❌ 转发最新短信异常: ${e.message}")
+                        putLong("debug_log_time", System.currentTimeMillis())
+                        apply()
                     }
                 }
             }
-        } catch (e: Exception) {
-            Log.e("MainActivity", "转发最新短信失败", e)
-            Toast.makeText(this, "❌ 转发失败: ${e.message}", Toast.LENGTH_LONG).show()
-        }
+        }.start()
+        
+        Log.d("MainActivity", "========== 转发最新短信结束 ==========")
     }
 }
 
