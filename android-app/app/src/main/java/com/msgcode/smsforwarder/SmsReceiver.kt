@@ -32,7 +32,6 @@ class SmsReceiver : BroadcastReceiver() {
         Log.d(TAG, "✅ Received SMS_RECEIVED_ACTION broadcast")
 
         // 检查服务是否启用
-        val prefs = context.getSharedPreferences("SmsForwarderPrefs", Context.MODE_PRIVATE)
         val serviceEnabled = prefs.getBoolean("service_enabled", false)
         
         Log.d(TAG, "Service enabled status: $serviceEnabled")
