@@ -534,7 +534,7 @@ class MainActivity : AppCompatActivity() {
                 smsBuilder.append("- 总短信数: $totalCount\n")
                 smsBuilder.append("- 收件箱: $inboxCount\n")
                 smsBuilder.append("- 发件箱: $outboxCount\n")
-                smsBuilder.append("- 显示详情: $smsCount 条\n\n")
+                smsBuilder.append("- 显示详情: ${smsCount} 条\n\n")
                 
                 if (totalCount == 0) {
                     smsBuilder.append("❌ 未找到任何短信\n")
@@ -543,9 +543,9 @@ class MainActivity : AppCompatActivity() {
                     smsBuilder.append("- 短信数据库为空\n")
                     smsBuilder.append("- 系统限制访问\n")
                 } else if (smsCount == 0) {
-                    smsBuilder.append("❌ 找到$totalCount条短信，但都没有内容\n")
+                    smsBuilder.append("❌ 找到${totalCount}条短信，但都没有内容\n")
                 } else {
-                    smsBuilder.append("✅ 成功读取并显示 $smsCount 条有内容的短信")
+                    smsBuilder.append("✅ 成功读取并显示 ${smsCount} 条有内容的短信")
                 }
                 
                 val result = smsBuilder.toString()
