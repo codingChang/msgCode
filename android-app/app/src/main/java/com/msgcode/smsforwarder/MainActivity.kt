@@ -52,6 +52,9 @@ class MainActivity : AppCompatActivity() {
         loadPreferences()
         setupClickListeners()
         startStatusUpdates()
+        
+        // 启动时立即检查剪贴板
+        checkClipboardOnStart()
     }
 
     private fun initViews() {
@@ -81,12 +84,8 @@ class MainActivity : AppCompatActivity() {
         etServerIp.setText(prefs.getString(KEY_SERVER_IP, "192.168.31.124"))
         etServerPort.setText(prefs.getString(KEY_SERVER_PORT, "5001"))
         
-        val clipboardEnabled = prefs.getBoolean(KEY_CLIPBOARD_ENABLED, true)  // 默认启用
-        switchClipboardSync.isChecked = clipboardEnabled
-        
-        if (clipboardEnabled) {
-            startClipboardMonitoring()
-        }
+        // 默认启用自动读取功能
+        switchClipboardSync.isChecked = true
     }
 
     private fun savePreferences() {
@@ -100,15 +99,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupClickListeners() {
+        // 开关始终保持开启状态
         switchClipboardSync.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked) {
-                startClipboardMonitoring()
-                Toast.makeText(this, "✅ 剪贴板监听已启用", Toast.LENGTH_SHORT).show()
-            } else {
-                stopClipboardMonitoring()
-                Toast.makeText(this, "❌ 剪贴板监听已停用", Toast.LENGTH_SHORT).show()
+            if (!isChecked) {
+                // 不允许关闭，重新设为true
+                switchClipboardSync.isChecked = true
+                Toast.makeText(this, "ℹ️ 此功能无需关闭，每次打开应用自动检查", Toast.LENGTH_SHORT).show()
             }
-            savePreferences()
         }
 
         btnTest.setOnClickListener {
@@ -116,7 +113,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnTestClipboard.setOnClickListener {
-            testClipboardSync()
+            // 重新检查剪贴板
+            checkClipboardOnStart()
         }
 
         btnViewHistory.setOnClickListener {
@@ -279,30 +277,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateStatus() {
-        val clipboardEnabled = switchClipboardSync.isChecked
         val serverIp = etServerIp.text.toString().trim()
         val serverPort = etServerPort.text.toString().trim()
         
         val statusBuilder = StringBuilder()
         statusBuilder.append("🔧 Mac服务器: ${if(serverIp.isNotEmpty()) "$serverIp:$serverPort" else "未配置"}\n\n")
         
-        statusBuilder.append("📋 监听状态: ${if(clipboardEnabled) "✅ 正在监听" else "❌ 已停止"}\n\n")
-        
-        if (clipboardEnabled) {
-            statusBuilder.append("💡 使用说明:\n")
-            statusBuilder.append("• 在任何地方复制6位数字\n")
-            statusBuilder.append("• 自动识别并同步到Mac\n")
-            statusBuilder.append("• Mac上可以直接粘贴使用\n\n")
-            statusBuilder.append("⚡ 全自动运行中...")
-        } else {
-            statusBuilder.append("⚠️ 请启用剪贴板监听开始同步")
-        }
+        statusBuilder.append("💡 使用方法:\n")
+        statusBuilder.append("• 复制6位验证码到剪贴板\n")
+        statusBuilder.append("• 打开此应用\n")
+        statusBuilder.append("• 自动读取并同步到Mac\n")
+        statusBuilder.append("• Mac上直接粘贴使用\n\n")
+        statusBuilder.append("🎯 每次打开应用都会自动检查剪贴板")
         
         tvStatus.text = statusBuilder.toString()
         
         // 更新调试日志显示
-        val debugLog = prefs.getString("debug_log", "👋 等待复制6位验证码...")
-        tvDebugLog.text = "📊 同步记录:\n\n$debugLog"
+        val debugLog = prefs.getString("debug_log", "👋 打开应用自动读取剪贴板...")
+        tvDebugLog.text = "📊 检查记录:\n\n$debugLog"
     }
 
     private fun startStatusUpdates() {
@@ -323,6 +315,59 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         updateRunnable?.let { handler.removeCallbacks(it) }
+    }
+
+    private fun checkClipboardOnStart() {
+        Log.d(TAG, "========== 应用启动，检查剪贴板 ==========")
+        
+        try {
+            val clipData = clipboardManager.primaryClip
+            if (clipData != null && clipData.itemCount > 0) {
+                val clipText = clipData.getItemAt(0).text?.toString()
+                if (!clipText.isNullOrBlank()) {
+                    Log.d(TAG, "剪贴板内容: $clipText")
+                    
+                    val verificationCode = extractVerificationCode(clipText)
+                    if (verificationCode != null) {
+                        Log.d(TAG, "发现6位验证码: $verificationCode")
+                        
+                        // 显示找到验证码的提示
+                        Toast.makeText(this, "🎯 发现验证码 $verificationCode，正在同步到Mac...", Toast.LENGTH_LONG).show()
+                        
+                        // 立即发送到Mac
+                        sendClipboardToServer(clipText, verificationCode)
+                    } else {
+                        Log.d(TAG, "剪贴板中未发现6位数字验证码")
+                        
+                        // 更新界面显示等待状态
+                        tvLastCode.text = "👋 欢迎使用！\n\n📋 剪贴板中未找到6位验证码\n\n💡 复制6位验证码后重新打开应用"
+                        
+                        prefs.edit().apply {
+                            putString("debug_log", "📋 剪贴板内容: ${clipText.take(50)}${if(clipText.length > 50) "..." else ""}\n❌ 未找到6位数字验证码")
+                            putLong("debug_log_time", System.currentTimeMillis())
+                            apply()
+                        }
+                    }
+                } else {
+                    Log.d(TAG, "剪贴板为空")
+                    tvLastCode.text = "👋 欢迎使用！\n\n📋 剪贴板为空\n\n💡 请先复制6位验证码再打开应用"
+                    
+                    prefs.edit().apply {
+                        putString("debug_log", "📋 剪贴板为空\n💡 请复制6位验证码后重新打开应用")
+                        putLong("debug_log_time", System.currentTimeMillis())
+                        apply()
+                    }
+                }
+            } else {
+                Log.d(TAG, "无法访问剪贴板")
+                tvLastCode.text = "⚠️ 无法读取剪贴板\n\n💡 请确保应用有访问权限"
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "读取剪贴板失败", e)
+            tvLastCode.text = "❌ 读取剪贴板出错\n\n${e.message}"
+        }
+        
+        Log.d(TAG, "========== 剪贴板检查完成 ==========")
     }
 
     override fun onDestroy() {

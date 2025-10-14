@@ -37,7 +37,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="任何地方复制6位数字，自动同步到Mac"
+                    android:text="复制6位验证码，打开应用自动同步到Mac"
                     android:textColor="#666"
                     android:textSize="14sp" />
             </LinearLayout>
@@ -121,7 +121,7 @@
                     android:layout_marginTop="8dp"
                     android:backgroundTint="#10b981"
                     android:padding="12dp"
-                    android:text="📋 测试剪贴板同步"
+                    android:text="🔄 重新检查剪贴板"
                     android:textColor="#FFF"
                     android:textSize="16sp" />
 
@@ -136,16 +136,6 @@
                     android:textColor="#FFF"
                     android:textSize="16sp" />
 
-                <Button
-                    android:id="@+id/btnSetDefaultSms"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:backgroundTint="#f59e0b"
-                    android:padding="12dp"
-                    android:text="⚙️ 荣耀手机权限设置"
-                    android:textColor="#FFF"
-                    android:textSize="16sp" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
@@ -182,7 +172,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="启用剪贴板监听"
+                        android:text="自动读取剪贴板"
                         android:textColor="#333"
                         android:textSize="16sp" />
 
