@@ -52,9 +52,6 @@ class MainActivity : AppCompatActivity() {
         loadPreferences()
         setupClickListeners()
         startStatusUpdates()
-        
-        // 启动时立即检查剪贴板
-        checkClipboardOnStart()
     }
 
     private fun initViews() {
@@ -309,6 +306,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        Log.d(TAG, "========== 应用恢复到前台 ==========")
+        
+        // 每次应用恢复到前台都检查剪贴板
+        checkClipboardOnStart()
         updateStatus()
     }
 
@@ -318,7 +319,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkClipboardOnStart() {
-        Log.d(TAG, "========== 应用启动，检查剪贴板 ==========")
+        Log.d(TAG, "========== 检查剪贴板内容 ==========")
         
         try {
             val clipData = clipboardManager.primaryClip
