@@ -39,14 +39,8 @@ class MainActivity : AppCompatActivity() {
         private const val KEY_SERVER_PORT = "server_port"
         private const val KEY_CLIPBOARD_ENABLED = "clipboard_enabled"
         
-        // 验证码匹配模式
-        private val VERIFICATION_CODE_PATTERNS = arrayOf(
-            Pattern.compile("验证码[：:\\s]*([0-9]{4,8})"),
-            Pattern.compile("验证码为[：:\\s]*([0-9]{4,8})"),
-            Pattern.compile("验证码是[：:\\s]*([0-9]{4,8})"),
-            Pattern.compile("code[：:\\s]*([0-9]{4,8})", Pattern.CASE_INSENSITIVE),
-            Pattern.compile("([0-9]{4,8})")
-        )
+        // 6位数字验证码匹配模式
+        private val VERIFICATION_CODE_PATTERN = Pattern.compile("(\\d{6})")
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -87,7 +81,7 @@ class MainActivity : AppCompatActivity() {
         etServerIp.setText(prefs.getString(KEY_SERVER_IP, "192.168.31.124"))
         etServerPort.setText(prefs.getString(KEY_SERVER_PORT, "5001"))
         
-        val clipboardEnabled = prefs.getBoolean(KEY_CLIPBOARD_ENABLED, false)
+        val clipboardEnabled = prefs.getBoolean(KEY_CLIPBOARD_ENABLED, true)  // 默认启用
         switchClipboardSync.isChecked = clipboardEnabled
         
         if (clipboardEnabled) {
@@ -167,19 +161,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun extractVerificationCode(text: String): String? {
-        for (pattern in VERIFICATION_CODE_PATTERNS) {
-            val matcher = pattern.matcher(text)
-            if (matcher.find()) {
-                val code = if (matcher.groupCount() > 0) {
-                    matcher.group(1)
-                } else {
-                    matcher.group(0)
-                }
-                // 验证码长度应该在4-8位之间
-                if (code != null && code.length in 4..8 && code.all { it.isDigit() }) {
-                    return code
-                }
-            }
+        val matcher = VERIFICATION_CODE_PATTERN.matcher(text)
+        if (matcher.find()) {
+            return matcher.group(1)  // 返回第一个找到的6位数字
         }
         return null
     }
@@ -206,24 +190,26 @@ class MainActivity : AppCompatActivity() {
 
                 runOnUiThread {
                     if (success) {
-                        val message = "✅ 验证码已同步: $verificationCode"
-                        Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
+                        // 显示大号通知
+                        Toast.makeText(this@MainActivity, "✅ 验证码 $verificationCode 已同步到Mac", Toast.LENGTH_LONG).show()
                         
                         // 更新界面显示
                         val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
-                        tvLastCode.text = "最近同步：$timeStr\n验证码：$verificationCode"
+                        tvLastCode.text = "🎯 最近同步的验证码\n\n⏰ $timeStr\n\n📱 $verificationCode\n\n✅ 已复制到Mac剪贴板\n可以在Mac上粘贴使用了"
                         
                         // 保存调试日志
-                        val debugMsg = "✅ 验证码同步成功!\n验证码: $verificationCode\n内容: ${content.take(50)}${if(content.length > 50) "..." else ""}"
+                        val debugMsg = "✅ 验证码: $verificationCode\n⏰ 时间: $timeStr\n📋 原文: ${content.take(80)}${if(content.length > 80) "..." else ""}\n✅ 状态: 已同步到Mac"
                         prefs.edit().apply {
                             putString("debug_log", debugMsg)
                             putLong("debug_log_time", System.currentTimeMillis())
+                            putString("last_code", verificationCode)
+                            putLong("last_code_time", System.currentTimeMillis())
                             apply()
                         }
                     } else {
-                        Toast.makeText(this@MainActivity, "❌ 同步失败，请检查服务器", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, "❌ 同步失败，请检查Mac服务器", Toast.LENGTH_LONG).show()
                         prefs.edit().apply {
-                            putString("debug_log", "❌ 验证码同步失败\n服务器: $serverIp:$serverPort")
+                            putString("debug_log", "❌ 验证码: $verificationCode\n⚠️ 同步失败\n服务器: $serverIp:$serverPort\n请确保Mac服务器正在运行")
                             putLong("debug_log_time", System.currentTimeMillis())
                             apply()
                         }
@@ -298,23 +284,25 @@ class MainActivity : AppCompatActivity() {
         val serverPort = etServerPort.text.toString().trim()
         
         val statusBuilder = StringBuilder()
-        statusBuilder.append("🔧 服务配置:\n")
-        statusBuilder.append("   IP: ${if(serverIp.isNotEmpty()) serverIp else "未配置"}\n")
-        statusBuilder.append("   端口: ${if(serverPort.isNotEmpty()) serverPort else "未配置"}\n\n")
+        statusBuilder.append("🔧 Mac服务器: ${if(serverIp.isNotEmpty()) "$serverIp:$serverPort" else "未配置"}\n\n")
         
-        statusBuilder.append("📋 剪贴板监听: ${if(clipboardEnabled) "✅ 已启用" else "❌ 已停用"}\n\n")
+        statusBuilder.append("📋 监听状态: ${if(clipboardEnabled) "✅ 正在监听" else "❌ 已停止"}\n\n")
         
-        statusBuilder.append("💡 使用说明:\n")
-        statusBuilder.append("1. 启用剪贴板监听\n")
-        statusBuilder.append("2. 收到验证码短信后复制数字\n")
-        statusBuilder.append("3. 验证码自动同步到Mac剪贴板\n")
-        statusBuilder.append("4. 在Mac上直接粘贴使用")
+        if (clipboardEnabled) {
+            statusBuilder.append("💡 使用说明:\n")
+            statusBuilder.append("• 在任何地方复制6位数字\n")
+            statusBuilder.append("• 自动识别并同步到Mac\n")
+            statusBuilder.append("• Mac上可以直接粘贴使用\n\n")
+            statusBuilder.append("⚡ 全自动运行中...")
+        } else {
+            statusBuilder.append("⚠️ 请启用剪贴板监听开始同步")
+        }
         
         tvStatus.text = statusBuilder.toString()
         
         // 更新调试日志显示
-        val debugLog = prefs.getString("debug_log", "等待剪贴板变化...")
-        tvDebugLog.text = "📊 调试信息:\n$debugLog"
+        val debugLog = prefs.getString("debug_log", "👋 等待复制6位验证码...")
+        tvDebugLog.text = "📊 同步记录:\n\n$debugLog"
     }
 
     private fun startStatusUpdates() {

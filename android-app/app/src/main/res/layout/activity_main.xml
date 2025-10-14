@@ -37,7 +37,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="复制验证码，自动同步到Mac剪贴板"
+                    android:text="任何地方复制6位数字，自动同步到Mac"
                     android:textColor="#666"
                     android:textSize="14sp" />
             </LinearLayout>

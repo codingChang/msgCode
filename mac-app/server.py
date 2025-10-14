@@ -30,19 +30,12 @@ def copy_to_clipboard(text):
         return False
 
 def extract_verification_code(text):
-    """从文本中提取验证码"""
-    # 匹配4-8位数字的验证码
-    patterns = [
-        r'验证码[：:\s]*(\d{4,8})',  # 验证码：123456
-        r'验证码为[：:\s]*(\d{4,8})',  # 验证码为123456
-        r'验证码是[：:\s]*(\d{4,8})',  # 验证码是123456
-        r'(\d{4,8})',  # 直接的4-8位数字
-    ]
-    
-    for pattern in patterns:
-        match = re.search(pattern, text)
-        if match:
-            return match.group(1)
+    """从文本中提取6位数字验证码"""
+    # 只匹配6位数字
+    pattern = r'(\d{6})'
+    match = re.search(pattern, text)
+    if match:
+        return match.group(1)
     return None
 
 def get_local_ip():
@@ -530,13 +523,15 @@ if __name__ == '__main__':
     print(f"访问地址: http://{local_ip}:{port}")
     print(f"本地访问: http://localhost:{port}")
     print("=" * 50)
-    print("在手机应用中配置上述IP地址，然后复制验证码即可同步")
+    print("在手机应用中配置上述IP地址")
     print("按 Ctrl+C 停止服务器")
     print("=" * 50)
     print(f"💡 使用方法：")
-    print(f"   1. 收到验证码短信后，选中验证码数字")
-    print(f"   2. 复制到剪贴板（长按选择复制）")
-    print(f"   3. 验证码自动同步到Mac剪贴板，直接粘贴使用")
+    print(f"   1. 在手机任何地方复制6位数字")
+    print(f"   2. 自动检测并同步到Mac剪贴板")
+    print(f"   3. 在Mac上直接Cmd+V粘贴使用")
+    print(f"")
+    print(f"🎯 只识别6位数字验证码（最常用）")
     print("=" * 50)
     
     try:
