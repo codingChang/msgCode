@@ -31,6 +31,9 @@ class MainActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private var updateRunnable: Runnable? = null
     private var clipboardListener: ClipboardManager.OnPrimaryClipChangedListener? = null
+    
+    // 防止重复检查同一个剪贴板内容
+    private var lastProcessedClipboardText: String? = null
 
     companion object {
         private const val TAG = "MainActivity"
@@ -52,6 +55,10 @@ class MainActivity : AppCompatActivity() {
         loadPreferences()
         setupClickListeners()
         startStatusUpdates()
+        
+        // 清空上次的处理记录
+        lastProcessedClipboardText = null
+        Log.d(TAG, "应用启动，清空剪贴板处理记录")
     }
 
     private fun initViews() {
@@ -110,6 +117,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnTestClipboard.setOnClickListener {
+            // 清空上次处理的记录，强制重新处理
+            lastProcessedClipboardText = null
+            Log.d(TAG, "手动触发检查剪贴板，清空历史记录")
+            
             // 重新检查剪贴板
             checkClipboardOnStart()
         }
@@ -308,8 +319,12 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         Log.d(TAG, "========== 应用恢复到前台 ==========")
         
-        // 每次应用恢复到前台都检查剪贴板
-        checkClipboardOnStart()
+        // 延迟检查剪贴板，避免时机问题
+        handler.postDelayed({
+            Log.d(TAG, "延迟检查剪贴板...")
+            checkClipboardOnStart()
+        }, 500) // 延迟500ms
+        
         updateStatus()
     }
 
@@ -328,6 +343,12 @@ class MainActivity : AppCompatActivity() {
                 if (!clipText.isNullOrBlank()) {
                     Log.d(TAG, "剪贴板内容: $clipText")
                     
+                    // 检查是否已经处理过这个内容
+                    if (clipText == lastProcessedClipboardText) {
+                        Log.d(TAG, "剪贴板内容未变化，跳过处理")
+                        return
+                    }
+                    
                     val verificationCode = extractVerificationCode(clipText)
                     if (verificationCode != null) {
                         Log.d(TAG, "发现6位验证码: $verificationCode")
@@ -335,10 +356,16 @@ class MainActivity : AppCompatActivity() {
                         // 显示找到验证码的提示
                         Toast.makeText(this, "🎯 发现验证码 $verificationCode，正在同步到Mac...", Toast.LENGTH_LONG).show()
                         
+                        // 记录已处理的内容
+                        lastProcessedClipboardText = clipText
+                        
                         // 立即发送到Mac
                         sendClipboardToServer(clipText, verificationCode)
                     } else {
                         Log.d(TAG, "剪贴板中未发现6位数字验证码")
+                        
+                        // 即使没有验证码，也记录处理过的内容，避免重复显示
+                        lastProcessedClipboardText = clipText
                         
                         // 更新界面显示等待状态
                         tvLastCode.text = "👋 欢迎使用！\n\n📋 剪贴板中未找到6位验证码\n\n💡 复制6位验证码后重新打开应用"
