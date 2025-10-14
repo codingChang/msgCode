@@ -28,7 +28,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="📱 短信转发器"
+                    android:text="📋 验证码同步器"
                     android:textColor="#667EEA"
                     android:textSize="24sp"
                     android:textStyle="bold" />
@@ -37,7 +37,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="将收到的短信自动转发到Mac电脑"
+                    android:text="复制验证码，自动同步到Mac剪贴板"
                     android:textColor="#666"
                     android:textSize="14sp" />
             </LinearLayout>
@@ -121,7 +121,7 @@
                     android:layout_marginTop="8dp"
                     android:backgroundTint="#10b981"
                     android:padding="12dp"
-                    android:text="📱 模拟短信测试"
+                    android:text="📋 测试剪贴板同步"
                     android:textColor="#FFF"
                     android:textSize="16sp" />
 
@@ -132,7 +132,7 @@
                     android:layout_marginTop="8dp"
                     android:backgroundTint="#8b5cf6"
                     android:padding="12dp"
-                    android:text="📖 读取短信内容"
+                    android:text="📊 查看同步历史"
                     android:textColor="#FFF"
                     android:textSize="16sp" />
 
@@ -182,7 +182,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="启用短信转发"
+                        android:text="启用剪贴板监听"
                         android:textColor="#333"
                         android:textSize="16sp" />
 

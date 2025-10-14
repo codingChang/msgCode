@@ -9,6 +9,8 @@ from flask_cors import CORS
 from datetime import datetime
 import socket
 import json
+import subprocess
+import re
 
 app = Flask(__name__)
 CORS(app)
@@ -16,6 +18,32 @@ CORS(app)
 # 存储最近的短信记录
 messages = []
 MAX_MESSAGES = 50
+
+def copy_to_clipboard(text):
+    """将文本复制到Mac剪贴板"""
+    try:
+        process = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
+        process.communicate(text.encode('utf-8'))
+        return True
+    except Exception as e:
+        print(f"❌ 复制到剪贴板失败: {e}")
+        return False
+
+def extract_verification_code(text):
+    """从文本中提取验证码"""
+    # 匹配4-8位数字的验证码
+    patterns = [
+        r'验证码[：:\s]*(\d{4,8})',  # 验证码：123456
+        r'验证码为[：:\s]*(\d{4,8})',  # 验证码为123456
+        r'验证码是[：:\s]*(\d{4,8})',  # 验证码是123456
+        r'(\d{4,8})',  # 直接的4-8位数字
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return match.group(1)
+    return None
 
 def get_local_ip():
     """获取本机IP地址"""
@@ -68,6 +96,74 @@ def receive_sms():
             'message': str(e)
         }), 400
 
+@app.route('/api/clipboard', methods=['POST'])
+def receive_clipboard():
+    """接收剪贴板内容并处理验证码"""
+    try:
+        data = request.get_json()
+        if not data or 'content' not in data:
+            return jsonify({
+                'status': 'error',
+                'message': '缺少剪贴板内容'
+            }), 400
+        
+        content = data.get('content', '').strip()
+        if not content:
+            return jsonify({
+                'status': 'error',
+                'message': '剪贴板内容为空'
+            }), 400
+        
+        # 尝试提取验证码
+        verification_code = extract_verification_code(content)
+        
+        if verification_code:
+            # 创建消息记录
+            message = {
+                'sender': '剪贴板',
+                'content': content,
+                'verification_code': verification_code,
+                'timestamp': data.get('timestamp', datetime.now().isoformat()),
+                'received_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'type': 'clipboard'
+            }
+            
+            # 添加到消息列表
+            messages.insert(0, message)
+            
+            # 保持最多50条消息
+            if len(messages) > MAX_MESSAGES:
+                messages.pop()
+            
+            # 复制验证码到Mac剪贴板
+            if copy_to_clipboard(verification_code):
+                print(f"[{message['received_at']}] 🎯 验证码已复制到剪贴板: {verification_code}")
+                print(f"原始内容: {content}")
+                
+                return jsonify({
+                    'status': 'success',
+                    'message': '验证码已复制到Mac剪贴板',
+                    'verification_code': verification_code
+                }), 200
+            else:
+                return jsonify({
+                    'status': 'warning',
+                    'message': '验证码提取成功但复制到剪贴板失败',
+                    'verification_code': verification_code
+                }), 200
+        else:
+            return jsonify({
+                'status': 'info',
+                'message': '未检测到验证码'
+            }), 200
+            
+    except Exception as e:
+        print(f"❌ 处理剪贴板内容错误: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 400
+
 @app.route('/api/messages', methods=['GET'])
 def get_messages():
     """获取最近的短信列表"""
@@ -92,7 +188,7 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>短信验证码接收器</title>
+    <title>验证码剪贴板同步器</title>
     <style>
         * {
             margin: 0;
@@ -299,7 +395,7 @@ HTML_TEMPLATE = """
 <body>
     <div class="container">
         <div class="header">
-            <h1>📱 短信验证码接收器</h1>
+                   <h1>📋 验证码剪贴板同步器</h1>
             <p style="color: #666; margin-top: 10px;">
                 <span class="status-indicator"></span>
                 服务运行中
@@ -308,7 +404,7 @@ HTML_TEMPLATE = """
                 <p><strong>本机IP地址：</strong><span class="ip-address" id="ipAddress">加载中...</span></p>
                 <p><strong>端口：</strong><span class="ip-address" id="portNumber">5001</span></p></p>
                 <p style="margin-top: 10px; font-size: 14px;">
-                    ℹ️ 请在安卓应用中配置此IP地址
+                    ℹ️ 在手机上复制验证码，自动同步到Mac剪贴板
                 </p>
             </div>
         </div>
@@ -324,8 +420,8 @@ HTML_TEMPLATE = """
                     <svg viewBox="0 0 24 24" fill="currentColor">
                         <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
                     </svg>
-                    <p>暂无短信</p>
-                    <p style="font-size: 14px; margin-top: 10px;">等待安卓设备发送短信...</p>
+                    <p>暂无验证码</p>
+                    <p style="font-size: 14px; margin-top: 10px;">在手机上复制验证码，自动同步到这里...</p>
                 </div>
             </div>
         </div>
@@ -428,16 +524,19 @@ if __name__ == '__main__':
     
     local_ip = get_local_ip()
     print("=" * 50)
-    print("📱 短信验证码接收服务器")
+    print("📋 验证码剪贴板同步器")
     print("=" * 50)
     print(f"本机IP地址: {local_ip}")
     print(f"访问地址: http://{local_ip}:{port}")
     print(f"本地访问: http://localhost:{port}")
     print("=" * 50)
-    print("请在安卓应用中配置上述IP地址和端口")
+    print("在手机应用中配置上述IP地址，然后复制验证码即可同步")
     print("按 Ctrl+C 停止服务器")
     print("=" * 50)
-    print(f"💡 提示：可以用 python3 server.py <端口号> 指定端口")
+    print(f"💡 使用方法：")
+    print(f"   1. 收到验证码短信后，选中验证码数字")
+    print(f"   2. 复制到剪贴板（长按选择复制）")
+    print(f"   3. 验证码自动同步到Mac剪贴板，直接粘贴使用")
     print("=" * 50)
     
     try:

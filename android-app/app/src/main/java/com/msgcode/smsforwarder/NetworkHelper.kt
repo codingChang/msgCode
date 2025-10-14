@@ -70,6 +70,45 @@ object NetworkHelper {
     }
 
     /**
+     * 发送剪贴板内容到Mac服务器
+     */
+    fun sendClipboard(serverIp: String, serverPort: String, data: Map<String, String>): Boolean {
+        return try {
+            val url = "http://$serverIp:$serverPort/api/clipboard"
+            
+            val json = gson.toJson(data)
+            
+            Log.d(TAG, "========== NetworkHelper发送剪贴板内容 ==========")
+            Log.d(TAG, "目标URL: $url")
+            Log.d(TAG, "发送数据: $json")
+            
+            val body = json.toRequestBody(JSON)
+            val request = Request.Builder()
+                .url(url)
+                .post(body)
+                .addHeader("Content-Type", "application/json")
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val responseBody = response.body?.string()
+                val success = response.isSuccessful
+                
+                Log.d(TAG, "响应状态码: ${response.code}")
+                Log.d(TAG, "响应内容: $responseBody")
+                Log.d(TAG, "发送${if(success) "成功" else "失败"}")
+                Log.d(TAG, "========== NetworkHelper结束 ==========")
+                
+                success
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ NetworkHelper发送剪贴板内容出错", e)
+            Log.e(TAG, "错误详情: ${e.message}")
+            Log.e(TAG, "服务器: $serverIp:$serverPort")
+            false
+        }
+    }
+
+    /**
      * 测试连接
      */
     fun testConnection(serverIp: String, serverPort: String): Boolean {

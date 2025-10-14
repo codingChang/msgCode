@@ -1,26 +1,20 @@
 package com.msgcode.smsforwarder
 
-import android.Manifest
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.content.pm.PackageManager
-import android.database.Cursor
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.provider.Telephony
 import android.util.Log
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import com.google.android.material.switchmaterial.SwitchMaterial
 import java.text.SimpleDateFormat
 import java.util.*
+import java.util.regex.Pattern
 
 class MainActivity : AppCompatActivity() {
 
@@ -31,20 +25,29 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvLastMessage: TextView
     private lateinit var tvDebugLog: TextView
     private lateinit var btnTest: Button
-    private lateinit var btnSimulateSms: Button
-    private lateinit var btnReadSms: Button
-    private lateinit var btnSetDefaultSms: Button
+    private lateinit var btnTestClipboard: Button
+    private lateinit var btnViewHistory: Button
+    private lateinit var btnClearHistory: Button
     private lateinit var prefs: SharedPreferences
     
+    private lateinit var clipboardManager: ClipboardManager
     private val handler = Handler(Looper.getMainLooper())
     private var updateRunnable: Runnable? = null
+    private var clipboardListener: ClipboardManager.OnPrimaryClipChangedListener? = null
 
     companion object {
-        private const val PREFS_NAME = "SmsForwarderPrefs"
+        private const val PREFS_NAME = "ClipboardSyncPrefs"
         private const val KEY_SERVER_IP = "server_ip"
         private const val KEY_SERVER_PORT = "server_port"
-        private const val KEY_SERVICE_ENABLED = "service_enabled"
-        private const val REQUEST_CODE_PERMISSIONS = 100
+        private const val KEY_CLIPBOARD_ENABLED = "clipboard_enabled"
+        
+        // 验证码匹配模式
+        private val VERIFICATION_CODE_PATTERNS = arrayOf(
+            Pattern.compile("验证码[：:\\s]*([0-9]{4,8})"),
+            Pattern.compile("验证码为[：:\\s]*([0-9]{4,8})"),
+            Pattern.compile("验证码是[：:\\s]*([0-9]{4,8})"),
+            Pattern.compile("([0-9]{4,8})")
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
